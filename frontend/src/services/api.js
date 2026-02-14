@@ -72,6 +72,8 @@ export const escalateSignalement = (workflowId, data) =>
   api.put(`/workflows/${workflowId}/escalate`, data);
 export const addWorkflowNote = (workflowId, data) =>
   api.post(`/workflows/${workflowId}/notes`, data);
+export const downloadTemplate = (templateName) =>
+  api.get(`/workflows/templates/${templateName}`, { responseType: 'blob' });
 
 /* ── Analytics ── */
 export const getAnalytics = (params) => api.get('/analytics', { params });
