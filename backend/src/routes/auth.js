@@ -1,9 +1,10 @@
 import express from 'express';
-import { register, login } from '../controllers/authController.js';
+import { login } from '../controllers/authController.js';
 
 const router = express.Router();
 
-router.post('/register', register);
+// Registration is disabled - all accounts must be created by administrators
+// Use the seed script or create users directly in the database
 router.post('/login', login);
 
 export default router;

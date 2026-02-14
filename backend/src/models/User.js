@@ -16,9 +16,42 @@ const userSchema = new mongoose.Schema({
     required: true
   },
   role: {
-    type: Number,
-    enum: [1, 2, 3],
-    default: 1
+    type: String,
+    enum: ['LEVEL1', 'LEVEL2', 'LEVEL3'],
+    default: 'LEVEL1'
+  },
+  // Role details
+  roleDetails: {
+    type: String,
+    enum: [
+      'SOS_MOTHER',
+      'EDUCATOR', 
+      'FIELD_STAFF',
+      'PSYCHOLOGIST',
+      'SOCIAL_WORKER',
+      'VILLAGE_DIRECTOR',
+      'NATIONAL_OFFICE'
+    ]
+  },
+  // Village assignment
+  village: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Village'
+  },
+  // For Level 3 users - can access multiple villages
+  accessibleVillages: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Village'
+  }],
+  phone: {
+    type: String
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  lastLogin: {
+    type: Date
   }
 }, {
   timestamps: true

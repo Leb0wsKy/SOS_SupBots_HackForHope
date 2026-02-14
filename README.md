@@ -26,12 +26,23 @@ npm install
 
 3. Update `.env` file with your MongoDB connection string
 
-4. Start the server:
+4. Seed the database (first time only):
+```bash
+npm run seed
+```
+This creates 4 test villages (Gammarth, Siliana, Mahres, Akouda) and admin accounts.
+
+5. Start the server:
 ```bash
 npm run dev
 ```
 
 The backend will run on `http://localhost:5000`
+
+**To add new users (admin only):**
+```bash
+npm run adduser
+```
 
 ### Frontend Setup
 
@@ -54,10 +65,12 @@ The frontend will run on `http://localhost:3000`
 
 ## Features
 
-- **Authentication**: JWT-based auth with role-based access control
-- **User Roles**: Level 1, Level 2, and Level 3 access
-- **Signalement Management**: CRUD operations for reports
-- **Analytics**: Dashboard for Level 3 users
+- **Authentication**: JWT-based auth with role-based access control (LEVEL1, LEVEL2, LEVEL3)
+- **No Public Registration**: All accounts created by administrators only
+- **User Roles**: Level 1 (Terrain Users), Level 2 (Psychologists/Social Workers), Level 3 (Directors/National Office)
+- **Signalement Management**: CRUD operations for incident reports with file uploads
+- **Workflow System**: Structured 7-stage process for Level 2 users
+- **Analytics**: Comprehensive dashboard with heatmaps for Level 3 users
 
 ## Tech Stack
 
@@ -76,17 +89,24 @@ The frontend will run on `http://localhost:3000`
 ## API Endpoints
 
 ### Auth
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
+- `POST /api/auth/login` - Login user (registration disabled for security)
 
 ### Signalement
-- `GET /api/signalement` - Get all signalements
-- `POST /api/signalement` - Create new signalement
+- `GET /api/signalement` - Get all signalements (filtered by user role)
+- `POST /api/signalement` - Create new signalement with file uploads
 - `PUT /api/signalement/:id` - Update signalement (Level 2+)
 - `DELETE /api/signalement/:id` - Delete signalement (Level 3)
 
-### Analytics
+### Workflow (Level 2+)
+- `GET /api/workflow/my-workflows` - Get assigned workflows
+- `POST /api/workflow` - Create workflow for signalement
+- `PUT /api/workflow/:id/stage` - Update workflow stage
+- `POST /api/workflow/:id/generate-dpe` - Generate DPE report with AI
+
+### Analytics (Level 3)
 - `GET /api/analytics` - Get analytics (Level 3 only)
+- `GET /api/analytics/heatmap` - Get heatmap data for visualization
+- `GET /api/analytics/village-ratings` - Get village performance ratings
 
 ## Database Models
 
@@ -100,4 +120,12 @@ The frontend will run on `http://localhost:3000`
 
 - Make sure MongoDB is running before starting the backend
 - Update the JWT_SECRET in `.env` for production
-- All API routes (except auth) require authentication
+- All API routes (except auth/login) require authentication
+- **No public registration** - all accounts must be created by administrators via `npm run seed` or `npm run adduser`
+
+## Test Accounts (After Running `npm run seed`)
+
+- **Level 3 (National Office)**: `admin@sos.tn` / `admin123`
+- **Level 2 (Psychologist)**: `psy@sos.tn` / `psy123`
+- **Level 1 (SOS Mother)**: `fatma@sos.tn` / `fatma123`
+- **Level 1 (Educator)**: `ahmed@sos.tn` / `ahmed123`

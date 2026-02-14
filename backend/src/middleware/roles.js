@@ -5,9 +5,18 @@ export const checkRole = (allowedRoles) => {
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+      return res.status(403).json({ 
+        message: 'Access denied. Insufficient permissions.',
+        requiredRole: allowedRoles,
+        userRole: req.user.role
+      });
     }
 
     next();
   };
 };
+
+// Helper middleware
+export const requireLevel1 = checkRole(['LEVEL1', 'LEVEL2', 'LEVEL3']);
+export const requireLevel2 = checkRole(['LEVEL2', 'LEVEL3']);
+export const requireLevel3 = checkRole(['LEVEL3']);
