@@ -10,7 +10,14 @@ import {
   assignSignalement
 } from '../controllers/signalementController.js';
 import { protect } from '../middleware/auth.js';
-import { requireLevel1, requireLevel2, requireLevel3 } from '../middleware/roles.js';
+import { 
+  requireLevel1, 
+  requireLevel2, 
+  requireLevel3,
+  checkVillageScope,
+  checkAssignment,
+  allowGovernanceOperation
+} from '../middleware/roles.js';
 import { logAudit } from '../middleware/auditLog.js';
 import { upload } from '../middleware/upload.js';
 
@@ -27,8 +34,9 @@ router.post('/',
   createSignalement
 );
 
-// Get all signalements (filtered by role)
+// Get all signalements (filtered by role and village scope)
 router.get('/', 
+  checkVillageScope,
   logAudit('VIEW_SIGNALEMENT'),
   getSignalements
 );
@@ -39,9 +47,10 @@ router.get('/:id',
   getSignalementById
 );
 
-// Update signalement (Level 2+)
+// Update signalement (Level 2+ with assignment check)
 router.put('/:id', 
   requireLevel2,
+  checkAssignment,
   logAudit('UPDATE_SIGNALEMENT', 'Signalement'),
   updateSignalement
 );
@@ -53,21 +62,21 @@ router.put('/:id/assign',
   assignSignalement
 );
 
-// Close signalement (Level 3)
+// Close signalement (Level 3 only - governance operation)
 router.put('/:id/close',
-  requireLevel3,
+  allowGovernanceOperation,
   logAudit('CLOSE_SIGNALEMENT', 'Signalement'),
   closeSignalement
 );
 
-// Archive signalement (Level 3)
+// Archive signalement (Level 3 only - governance operation)
 router.put('/:id/archive',
-  requireLevel3,
+  allowGovernanceOperation,
   logAudit('UPDATE_SIGNALEMENT', 'Signalement'),
   archiveSignalement
 );
 
-// Delete signalement (Level 3)
+// Delete signalement (Level 3 only)
 router.delete('/:id', 
   requireLevel3,
   logAudit('DELETE_SIGNALEMENT', 'Signalement'),

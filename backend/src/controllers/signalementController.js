@@ -87,20 +87,35 @@ export const getSignalements = async (req, res) => {
     
     let filter = {};
     
-    // Role-based filtering
+    // Role-based filtering with village scope
     if (req.user.role === 'LEVEL1') {
       // Level 1 only sees their own village's reports
       filter.village = req.user.village;
     } else if (req.user.role === 'LEVEL2') {
-      // Level 2 sees assigned or their village
+      // Level 2 can only see signalements from their assigned villages
+      if (req.accessibleVillages && req.accessibleVillages.length > 0) {
+        filter.village = { $in: req.accessibleVillages };
+      }
+      
+      // If they want only their primary village
       if (myVillage === 'true') {
         filter.village = req.user.village;
       }
     }
-    // Level 3 sees all
+    // Level 3 sees all (no filter)
     
     if (status) filter.status = status;
-    if (village) filter.village = village;
+    if (village) {
+      // Level 2 can only filter within their accessible villages
+      if (req.user.role === 'LEVEL2') {
+        if (!req.accessibleVillages || !req.accessibleVillages.includes(village)) {
+          return res.status(403).json({ 
+            message: 'Access denied. You can only access signalements from your assigned villages.' 
+          });
+        }
+      }
+      filter.village = village;
+    }
     if (urgencyLevel) filter.urgencyLevel = urgencyLevel;
     if (incidentType) filter.incidentType = incidentType;
     
@@ -137,10 +152,19 @@ export const getSignalementById = async (req, res) => {
   }
 };
 
-// Update signalement (Level 2+)
+// Update signalement (Level 2+ with restrictions)
 export const updateSignalement = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Level 3 cannot use general update - only closure/archive
+    if (req.user.role === 'LEVEL3') {
+      return res.status(403).json({ 
+        message: 'Governance users cannot use general update. Use closure or archive endpoints instead.'
+      });
+    }
+
+    // Level 2 must be assigned (checked by middleware)
     const signalement = await Signalement.findByIdAndUpdate(
       id,
       req.body,
