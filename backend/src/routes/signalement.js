@@ -7,7 +7,8 @@ import {
   deleteSignalement,
   closeSignalement,
   archiveSignalement,
-  assignSignalement
+  assignSignalement,
+  downloadAttachment
 } from '../controllers/signalementController.js';
 import { protect } from '../middleware/auth.js';
 import { requireLevel1, requireLevel2, requireLevel3 } from '../middleware/roles.js';
@@ -37,6 +38,12 @@ router.get('/',
 router.get('/:id',
   logAudit('VIEW_SIGNALEMENT'),
   getSignalementById
+);
+
+// Download attachment file
+router.get('/:id/attachments/:filename',
+  logAudit('DOWNLOAD_ATTACHMENT'),
+  downloadAttachment
 );
 
 // Update signalement (Level 2+)

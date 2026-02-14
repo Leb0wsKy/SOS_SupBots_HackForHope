@@ -1,5 +1,11 @@
 import Signalement from '../models/Signalement.js';
 import Village from '../models/Village.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Create new signalement with file uploads
 export const createSignalement = async (req, res) => {
@@ -246,6 +252,55 @@ export const assignSignalement = async (req, res) => {
     await signalement.save();
 
     res.json(signalement);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Download attachment file
+export const downloadAttachment = async (req, res) => {
+  try {
+    const { id, filename } = req.params;
+
+    // Find signalement and verify attachment exists
+    const signalement = await Signalement.findById(id);
+    if (!signalement) {
+      return res.status(404).json({ message: 'Signalement not found' });
+    }
+
+    // Check if user has permission to view this signalement
+    if (req.user.role === 'LEVEL1') {
+      // Level 1 can only access their own village's files
+      const userVillageId = req.user.village?._id || req.user.village;
+      const signalementVillageId = signalement.village;
+      
+      if (!userVillageId || userVillageId.toString() !== signalementVillageId.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+    // Level 2 and 3 can access all files
+
+    // Find attachment in signalement
+    const attachment = signalement.attachments.find(att => att.filename === filename);
+    if (!attachment) {
+      return res.status(404).json({ message: 'Attachment not found' });
+    }
+
+    // Build file path
+    const filePath = path.join(__dirname, '../../uploads', filename);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found on server' });
+    }
+
+    // Set appropriate headers
+    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader('Content-Disposition', `attachment; filename="${attachment.originalName}"`);
+
+    // Stream file to response
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
