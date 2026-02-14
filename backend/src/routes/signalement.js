@@ -7,7 +7,9 @@ import {
   deleteSignalement,
   closeSignalement,
   archiveSignalement,
-  assignSignalement
+  assignSignalement,
+  sauvegarderSignalement,
+  getMySignalementsWithDeadlines
 } from '../controllers/signalementController.js';
 import { protect } from '../middleware/auth.js';
 import { 
@@ -41,6 +43,13 @@ router.get('/',
   getSignalements
 );
 
+// Get my signalements with deadline tracking (Level 2)
+router.get('/my-deadlines',
+  requireLevel2,
+  logAudit('VIEW_SIGNALEMENT'),
+  getMySignalementsWithDeadlines
+);
+
 // Get signalement by ID
 router.get('/:id',
   logAudit('VIEW_SIGNALEMENT'),
@@ -60,6 +69,13 @@ router.put('/:id/assign',
   requireLevel2,
   logAudit('UPDATE_SIGNALEMENT', 'Signalement'),
   assignSignalement
+);
+
+// Sauvegarder signalement (Level 2 takes ownership with 24h deadline)
+router.put('/:id/sauvegarder',
+  requireLevel2,
+  logAudit('SAUVEGARDER_SIGNALEMENT', 'Signalement'),
+  sauvegarderSignalement
 );
 
 // Close signalement (Level 3 only - governance operation)
