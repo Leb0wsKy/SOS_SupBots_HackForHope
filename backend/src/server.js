@@ -45,10 +45,10 @@ connectDB();
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/signalement', signalementRoutes);
+app.use('/api/signalements', signalementRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.use('/api/workflow', workflowRoutes);
-app.use('/api/village', villageRoutes);
+app.use('/api/workflows', workflowRoutes);
+app.use('/api/villages', villageRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Basic route
@@ -58,9 +58,9 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       auth: '/api/auth',
-      signalement: '/api/signalement',
-      workflow: '/api/workflow',
-      village: '/api/village',
+      signalements: '/api/signalements',
+      workflows: '/api/workflows',
+      villages: '/api/villages',
       admin: '/api/admin',
       analytics: '/api/analytics'
     }
