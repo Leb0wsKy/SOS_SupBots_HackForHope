@@ -203,6 +203,7 @@ export const getSignalements = async (req, res) => {
       .populate('village', 'name location region')
       .populate('assignedTo', 'name email')
       .populate('classifiedBy', 'name')
+      .populate('workflow', 'currentStage status stages assignedTo classification')
       .sort({ createdAt: -1 });
 
     const masked = signalements.map(maskAnonymousSignalement);

@@ -248,7 +248,26 @@ function DashboardLevel3() {
     setExporting(true);
     try {
       const { data } = await exportData(dateRange);
-      const url = window.URL.createObjectURL(data);
+      // Backend returns JSON — convert to CSV for download
+      const records = data.data || [];
+      if (records.length === 0) {
+        setExporting(false);
+        return;
+      }
+      const headers = Object.keys(records[0]);
+      const csvRows = [
+        headers.join(','),
+        ...records.map((r) =>
+          headers.map((h) => {
+            const val = r[h];
+            if (val === null || val === undefined) return '';
+            const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+            return `"${str.replace(/"/g, '""')}"`;
+          }).join(',')
+        ),
+      ];
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `export-${new Date().toISOString().slice(0, 10)}.csv`;

@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import {
   getSignalements,
-  getMyWorkflows,
   sauvegarderSignalement,
   createWorkflow,
   updateWorkflowStage,
@@ -50,22 +49,42 @@ const KANBAN_COLUMNS = [
   { key: 'CLOTURE', label: 'Clôturés', accent: 'border-sos-green', iconBg: 'bg-sos-green-light', iconColor: 'text-sos-green' },
 ];
 
-const WORKFLOW_STAGES_LABELS = {
-  INITIAL: 'Rapport initial',
-  DPE: 'Rapport DPE',
-  EVALUATION: 'Évaluation',
-  ACTION_PLAN: 'Plan d\'action',
-  FOLLOW_UP: 'Suivi',
-  FINAL_REPORT: 'Rapport final',
-  CLOSURE: 'Clôture',
-  COMPLETED: 'Terminé',
-};
 
 const CLASSIFICATION_OPTIONS = [
   { value: 'SAUVEGARDE', label: 'Sauvegarde', color: 'bg-sos-red-light text-sos-red' },
   { value: 'PRISE_EN_CHARGE', label: 'Prise en charge', color: 'bg-sos-blue-light text-sos-blue' },
   { value: 'FAUX_SIGNALEMENT', label: 'Faux signalement', color: 'bg-sos-gray-100 text-sos-gray-600' },
 ];
+
+/**
+ * Ordered mapping: camelCase stage key → enum value.
+ * The backend `updateWorkflowStage` expects the camelCase key in `req.body.stage`,
+ * while `workflow.currentStage` stores the enum value after completion.
+ */
+const STAGE_ORDER = [
+  { key: 'initialReport', enum: 'INITIAL', label: 'Rapport initial' },
+  { key: 'dpeReport', enum: 'DPE', label: 'Rapport DPE' },
+  { key: 'evaluation', enum: 'EVALUATION', label: 'Évaluation' },
+  { key: 'actionPlan', enum: 'ACTION_PLAN', label: 'Plan d\'action' },
+  { key: 'followUpReport', enum: 'FOLLOW_UP', label: 'Suivi' },
+  { key: 'finalReport', enum: 'FINAL_REPORT', label: 'Rapport final' },
+  { key: 'closureNotice', enum: 'CLOSURE', label: 'Clôture' },
+];
+
+/** Returns the next uncompleted stage, or null if all done. */
+const getNextStage = (workflow) => {
+  if (!workflow?.stages) return null;
+  for (const s of STAGE_ORDER) {
+    if (!workflow.stages[s.key]?.completed) return s;
+  }
+  return null;
+};
+
+/** Returns how many stages are completed. */
+const completedStageCount = (workflow) => {
+  if (!workflow?.stages) return 0;
+  return STAGE_ORDER.filter((s) => workflow.stages[s.key]?.completed).length;
+};
 
 const timeAgo = (date) => {
   if (!date) return '';
@@ -178,10 +197,13 @@ const SignalementCard = ({ item, onSelect }) => {
         <span>{item.village?.name || ''}</span>
       </div>
       {/* Workflow stage */}
-      {item.workflow && (
+      {item.workflow && typeof item.workflow === 'object' && (
         <div className="mt-2 pt-2 border-t border-sos-gray-100 flex items-center gap-1.5 text-xs text-sos-blue">
           <ClipboardList className="w-3.5 h-3.5" />
-          {WORKFLOW_STAGES_LABELS[item.workflow.currentStage] || item.workflow.currentStage}
+          {(() => {
+            const next = getNextStage(item.workflow);
+            return next ? next.label : 'Terminé';
+          })()}
         </div>
       )}
       {/* Arrow on hover */}
@@ -198,6 +220,9 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   const [stageContent, setStageContent] = useState('');
 
   if (!item) return null;
+
+  const wf = item.workflow && typeof item.workflow === 'object' ? item.workflow : null;
+  const nextStage = wf ? getNextStage(wf) : null;
 
   const handleSauvegarder = async () => {
     setActionLoading('sauv');
@@ -218,22 +243,23 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   };
 
   const handleClassify = async (classification) => {
-    if (!item.workflow?._id) return;
+    if (!wf?._id) return;
     setActionLoading('cls');
     try {
-      await classifyAPI(item.workflow._id, { classification });
+      await classifyAPI(wf._id, { classification });
       onRefresh();
     } catch { /* ignore */ }
     setActionLoading('');
   };
 
   const handleAdvanceStage = async () => {
-    if (!item.workflow?._id) return;
+    if (!wf?._id || !nextStage) return;
     setActionLoading('stage');
     const fd = new FormData();
+    fd.append('stage', nextStage.key);
     fd.append('content', stageContent || 'Étape validée');
     try {
-      await updateWorkflowStage(item.workflow._id, fd);
+      await updateWorkflowStage(wf._id, fd);
       setStageContent('');
       onRefresh();
     } catch { /* ignore */ }
@@ -315,39 +341,40 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
           )}
 
           {/* Workflow / Progress */}
-          {item.workflow && (
+          {wf && (
             <div>
               <p className="text-xs font-bold text-sos-gray-700 uppercase tracking-wide mb-3">
                 Progression du workflow
               </p>
+              {/* Progress bar — based on actual stage completion, not currentStage enum */}
               <div className="flex items-center gap-1 mb-4">
-                {Object.keys(WORKFLOW_STAGES_LABELS).map((stage) => {
-                  const stageIdx = Object.keys(WORKFLOW_STAGES_LABELS).indexOf(stage);
-                  const currentIdx = Object.keys(WORKFLOW_STAGES_LABELS).indexOf(item.workflow.currentStage);
-                  const done = stageIdx < currentIdx;
-                  const active = stageIdx === currentIdx;
+                {STAGE_ORDER.map((stage) => {
+                  const done = wf.stages?.[stage.key]?.completed;
+                  const active = nextStage?.key === stage.key;
                   return (
                     <div
-                      key={stage}
+                      key={stage.key}
                       className={`h-2 flex-1 rounded-full transition-colors ${
                         done ? 'bg-sos-green' : active ? 'bg-sos-blue' : 'bg-sos-gray-200'
                       }`}
-                      title={WORKFLOW_STAGES_LABELS[stage]}
+                      title={stage.label}
                     />
                   );
                 })}
               </div>
               <p className="text-sm text-sos-blue font-medium">
-                Étape actuelle : {WORKFLOW_STAGES_LABELS[item.workflow.currentStage]}
+                {nextStage
+                  ? `Étape actuelle : ${nextStage.label}`
+                  : 'Toutes les étapes sont terminées'}
               </p>
 
-              {/* Stage content input */}
-              {item.workflow.status === 'ACTIVE' && (
+              {/* Stage content input — only if workflow is active and there is a next stage */}
+              {wf.status === 'ACTIVE' && nextStage && (
                 <div className="mt-3 space-y-2">
                   <textarea
                     value={stageContent}
                     onChange={(e) => setStageContent(e.target.value)}
-                    placeholder="Contenu / notes pour cette étape…"
+                    placeholder={`Contenu pour : ${nextStage.label}…`}
                     rows={3}
                     className="w-full px-3 py-2 rounded-lg border border-sos-gray-300 text-sm
                                placeholder:text-sos-gray-400
@@ -360,7 +387,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
                                hover:bg-sos-blue-dark transition disabled:opacity-60 cursor-pointer"
                   >
                     {actionLoading === 'stage' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-                    Valider l'étape
+                    Valider : {nextStage.label}
                   </button>
                 </div>
               )}
@@ -368,7 +395,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
           )}
 
           {/* Classification */}
-          {item.workflow && !item.classification && (
+          {wf && !item.classification && (
             <div>
               <p className="text-xs font-bold text-sos-gray-700 uppercase tracking-wide mb-2">Classification</p>
               <div className="flex flex-wrap gap-2">
@@ -397,7 +424,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
 
           {/* Actions */}
           <div className="pt-4 border-t border-sos-gray-200 space-y-2">
-            {item.status === 'EN_ATTENTE' && !item.workflow && (
+            {item.status === 'EN_ATTENTE' && !wf && (
               <>
                 <button
                   onClick={handleSauvegarder}

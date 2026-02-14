@@ -75,6 +75,6 @@ export const getAnalytics = (params) => api.get('/analytics', { params });
 export const getHeatmapData = () => api.get('/analytics/heatmap');
 export const getVillageRatings = () => api.get('/analytics/village-ratings');
 export const exportData = (params) =>
-  api.get('/analytics/export', { params, responseType: 'blob' });
+  api.get('/analytics/export', { params });
 
 export default api;
