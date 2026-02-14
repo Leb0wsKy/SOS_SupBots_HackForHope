@@ -27,7 +27,7 @@ const enforceVillageScope = (req, signalement) => {
   if (role === 'LEVEL3' && roleDetails === 'NATIONAL_OFFICE') return null;
 
   const signalementVillageId = String(signalement.village?._id || signalement.village);
-  const userVillageId = String(req.user.village || '');
+  const userVillageId = String(req.user.village?._id || req.user.village || '');
 
   if (role === 'LEVEL3' && roleDetails === 'VILLAGE_DIRECTOR') {
     return signalementVillageId === userVillageId ? null : 'Village scope violation';
@@ -81,7 +81,7 @@ export const createSignalement = async (req, res) => {
     // AI detection placeholder - calculate suspicion score
     const aiSuspicionScore = calculateAISuspicionScore(description, incidentType);
 
-    const resolvedVillage = village || req.user.village || undefined;
+    const resolvedVillage = village || req.user.village?._id || req.user.village || undefined;
 
     const signalement = new Signalement({
       title,
@@ -171,7 +171,7 @@ export const getSignalements = async (req, res) => {
     // Role-based filtering with village scope
     if (req.user.role === 'LEVEL1') {
       // Level 1 only sees their own village's reports
-      filter.village = req.user.village;
+      filter.village = req.user.village?._id || req.user.village;
     } else if (req.user.role === 'LEVEL2') {
       // Level 2 can only see signalements from their assigned villages
       if (req.accessibleVillages && req.accessibleVillages.length > 0) {
@@ -188,10 +188,10 @@ export const getSignalements = async (req, res) => {
       
       // If they want only their primary village
       if (myVillage === 'true') {
-        filter.village = req.user.village;
+        filter.village = req.user.village?._id || req.user.village;
       }
     } else if (req.user.role === 'LEVEL3' && req.user.roleDetails === 'VILLAGE_DIRECTOR') {
-      filter.village = req.user.village;
+      filter.village = req.user.village?._id || req.user.village;
     }
     // Level 3 (national) and Level 4 see all
     
