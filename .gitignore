@@ -9,7 +9,7 @@ yarn.lock
 .env.development
 .env.production
 .env.test
-
+backend/.env
 # Backend uploads (keep directory, ignore files)
 backend/uploads/*
 !backend/uploads/.gitkeep
