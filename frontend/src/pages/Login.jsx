@@ -124,6 +124,50 @@ function Login() {
             </button>
           </form>
 
+          {/* Demo Credentials */}
+          <div className="mt-6 border-t border-sos-gray-200 pt-6">
+            <p className="text-xs font-semibold text-sos-gray-700 mb-4 text-center">
+              🔑 Identifiants de Test:
+            </p>
+            <div className="space-y-3 text-xs">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="font-semibold text-green-800 mb-1">🏠 Level 1 - Maman SOS:</div>
+                <div className="text-green-700">
+                  <div><strong>Email:</strong> fatma@sos.tn</div>
+                  <div><strong>Mot de passe:</strong> fatma123</div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="font-semibold text-blue-800 mb-1">🧠 Level 2 - Psychologue:</div>
+                <div className="text-blue-700">
+                  <div><strong>Email:</strong> psy@sos.tn</div>
+                  <div><strong>Mot de passe:</strong> psy123</div>
+                </div>
+              </div>
+              
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <div className="font-semibold text-purple-800 mb-1">⚖️ Level 3 - Admin:</div>
+                <div className="text-purple-700">
+                  <div><strong>Email:</strong> admin@sos.tn</div>
+                  <div><strong>Mot de passe:</strong> admin123</div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="font-semibold text-amber-800 mb-1">👨‍🏫 Level 1 - Éducateur:</div>
+                <div className="text-amber-700">
+                  <div><strong>Email:</strong> ahmed@sos.tn</div>
+                  <div><strong>Mot de passe:</strong> ahmed123</div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+              <strong>Note:</strong> If credentials don't work, run: <code className="bg-yellow-100 px-1 rounded">cd backend && node seed.js</code>
+            </div>
+          </div>
+
           <p className="mt-6 text-center text-xs text-sos-gray-400">
             Accès réservé au personnel autorisé de SOS Villages d'Enfants
           </p>

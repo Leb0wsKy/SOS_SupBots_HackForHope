@@ -176,22 +176,29 @@ export const getSignalements = async (req, res) => {
       // Level 1 only sees their own village's reports
       filter.village = req.user.village?._id || req.user.village;
     } else if (req.user.role === 'LEVEL2') {
-      // Level 2 can only see signalements from their assigned villages
-      if (req.accessibleVillages && req.accessibleVillages.length > 0) {
-        filter.village = { $in: req.accessibleVillages };
-      }
+      // Level 2 can see signalements from their village or assigned to them
+      console.log('Level 2 filtering - User:', req.user.id, 'Village:', req.user.village);
       
-      // Level 2 can only see:
-      // 1. Unassigned signalements (EN_ATTENTE)
-      // 2. Their own assigned signalements
-      filter.$or = [
-        { status: 'EN_ATTENTE', assignedTo: null },
-        { assignedTo: req.user.id }
-      ];
+      // Simplified filtering: Level 2 sees unassigned signalements from their village + their own assigned ones
+      const userVillage = req.user.village?._id || req.user.village;
+      
+      if (userVillage) {
+        filter.$or = [
+          { status: 'EN_ATTENTE', village: userVillage }, // Unassigned from their village
+          { assignedTo: req.user.id } // Their assigned signalements
+        ];
+      } else {
+        // If no specific village, see all unassigned + their assigned
+        filter.$or = [
+          { status: 'EN_ATTENTE', assignedTo: null },
+          { assignedTo: req.user.id }
+        ];
+      }
       
       // If they want only their primary village
       if (myVillage === 'true') {
-        filter.village = req.user.village?._id || req.user.village;
+        filter.village = userVillage;
+        delete filter.$or; // Remove $or when filtering by specific village
       }
     } else if (req.user.role === 'LEVEL3' && req.user.roleDetails === 'VILLAGE_DIRECTOR') {
       filter.village = req.user.village?._id || req.user.village;
