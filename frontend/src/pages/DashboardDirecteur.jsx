@@ -235,7 +235,8 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
           {/* Details grid */}
           <div className="grid grid-cols-2 gap-4">
             {item.childName && <div><p className="text-sos-gray-400 text-xs mb-0.5">Enfant</p><p className="font-medium text-sos-gray-800">{item.childName}</p></div>}
-            {item.createdBy && <div><p className="text-sos-gray-400 text-xs mb-0.5">Déclarant</p><p className="font-medium text-sos-gray-800">{item.createdBy?.name || '—'}</p></div>}
+            {item.createdBy ? <div><p className="text-sos-gray-400 text-xs mb-0.5">Déclarant</p><p className="font-medium text-sos-gray-800">{item.createdBy?.name || '—'}</p></div>
+              : item.isAnonymous && <div><p className="text-sos-gray-400 text-xs mb-0.5">Déclarant</p><p className="font-medium text-amber-600 italic">Anonyme</p></div>}
             {item.assignedTo && <div><p className="text-sos-gray-400 text-xs mb-0.5">Psychologue</p><p className="font-medium text-sos-gray-800">{item.assignedTo?.name || '—'}</p></div>}
             {item.classification && <div><p className="text-sos-gray-400 text-xs mb-0.5">Classification</p><p className="font-medium text-sos-gray-800">{item.classification}</p></div>}
           </div>

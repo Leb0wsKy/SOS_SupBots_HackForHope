@@ -14,9 +14,8 @@ const maskAnonymousSignalement = (signalement) => {
   const data = signalement.toObject ? signalement.toObject() : { ...signalement };
 
   if (data.isAnonymous) {
+    // Only hide the reporter's identity, NOT the child/abuser names
     data.createdBy = null;
-    data.childName = null;
-    data.abuserName = null;
   }
 
   return data;

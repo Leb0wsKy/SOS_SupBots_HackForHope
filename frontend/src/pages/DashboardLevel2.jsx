@@ -832,7 +832,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
           </div>
 
           {/* People */}
-          {(!item.isAnonymous && (item.childName || item.abuserName)) && (
+          {(item.childName || item.abuserName) && (
             <div className="grid grid-cols-2 gap-4 text-sm">
               {item.childName && (
                 <div>
