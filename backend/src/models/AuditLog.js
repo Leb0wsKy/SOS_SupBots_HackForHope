@@ -13,7 +13,11 @@ const auditLogSchema = new mongoose.Schema({
       'VIEW_USERS',
       'CREATE_USER',
       'UPDATE_USER',
+      'UPDATE_USER_ROLE',
       'RESET_PASSWORD',
+      'GRANT_TEMP_ROLE',
+      'REVOKE_TEMP_ROLE',
+      'DELETE_USER',
       'CREATE_SIGNALEMENT',
       'UPDATE_SIGNALEMENT',
       'DELETE_SIGNALEMENT',
@@ -21,8 +25,19 @@ const auditLogSchema = new mongoose.Schema({
       'ESCALATE_SIGNALEMENT',
       'CLOSE_SIGNALEMENT',
       'VIEW_SIGNALEMENT',
+      'VIEW_SIGNALEMENTS',
+      'VIEW_ALL_SIGNALEMENTS',
+      'VIEW_AUDIT_LOGS',
+      'ARCHIVE_SIGNALEMENT',
+      'ASSIGN_SIGNALEMENT',
+      'DIRECTOR_SIGN',
+      'DIRECTOR_FORWARD',
+      'PREDICT_FALSE_ALARM',
       'CREATE_WORKFLOW',
       'UPDATE_WORKFLOW',
+      'CLOSE_WORKFLOW',
+      'COMPLETE_STAGE',
+      'DOWNLOAD_TEMPLATE',
       'GENERATE_REPORT',
       'LOGIN',
       'LOGOUT',
@@ -33,20 +48,18 @@ const auditLogSchema = new mongoose.Schema({
       'DOWNLOAD_ATTACHMENT',
       'SAUVEGARDER_SIGNALEMENT',
       'MARK_FAUX_SIGNALEMENT',
-      'CLOSE_WORKFLOW',
       'GENERATE_DPE',
       'VIEW_DPE',
       'UPDATE_DPE',
       'SUBMIT_DPE',
       'SAVE_DPE_REPORT',
       'VIEW_NOTIFICATIONS',
-      'MARK_NOTIFICATION_READ',
-      'VIEW_SIGNALEMENTS'
+      'MARK_NOTIFICATION_READ'
     ]
   },
   targetModel: {
     type: String,
-    enum: ['User', 'Signalement', 'Workflow', 'Village', 'Analytics']
+    enum: ['User', 'Signalement', 'Workflow', 'Village', 'Analytics', 'AuditLog']
   },
   targetId: {
     type: mongoose.Schema.Types.ObjectId
@@ -71,5 +84,6 @@ const auditLogSchema = new mongoose.Schema({
 // Index for faster queries
 auditLogSchema.index({ user: 1, timestamp: -1 });
 auditLogSchema.index({ action: 1, timestamp: -1 });
+auditLogSchema.index({ createdAt: -1 });
 
 export default mongoose.model('AuditLog', auditLogSchema);

@@ -47,6 +47,7 @@ export const createSignalement = (formData) =>
   });
 
 export const getSignalements = () => api.get('/signalements');
+export const getMyCreatedSignalements = () => api.get('/signalements/my-created');
 
 export const closeSignalement = (id, closureReason) =>
   api.put(`/signalements/${id}/close`, { closureReason });
@@ -129,6 +130,9 @@ export const downloadWorkflowAttachment = (workflowId, stage, filename) =>
 export const getAnalytics = () => api.get('/analytics');
 export const getVillageRatings = () => api.get('/analytics/village-ratings');
 export const exportData = (params) => api.get('/analytics/export', { params, responseType: 'blob' });
+
+// History / Activity logs (Level 2+)
+export const getActivityHistory = (params) => api.get('/history', { params });
 
 // Admin (Level 4)
 export const getAdminUsers = () => api.get('/admin/users');

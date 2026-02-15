@@ -151,6 +151,22 @@ function calculateAISuspicionScore(description, incidentType) {
   return Math.min(score, 100);
 }
 
+// Get signalements created by the current user (for Level 1 "my signalements")
+export const getMyCreatedSignalements = async (req, res) => {
+  try {
+    const signalements = await Signalement.find({ createdBy: req.user.id, isArchived: { $ne: true } })
+      .populate('village', 'name location region')
+      .populate('assignedTo', 'name email')
+      .populate('classifiedBy', 'name')
+      .sort({ createdAt: -1 });
+
+    const masked = signalements.map(maskAnonymousSignalement);
+    res.json(masked);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // Get all signalements (with filtering)
 export const getSignalements = async (req, res) => {
   try {

@@ -3,6 +3,7 @@ import {
   createSignalement,
   getSignalements,
   getSignalementById,
+  getMyCreatedSignalements,
   updateSignalement,
   deleteSignalement,
   closeSignalement,
@@ -41,6 +42,13 @@ router.post('/',
   logAudit('CREATE_SIGNALEMENT', 'Signalement'),
   invalidateCache(['cache:signalements:*', 'cache:analytics:*']),
   createSignalement
+);
+
+// Get signalements created by the current user (Level 1 "my signalements")
+router.get('/my-created',
+  requireLevel1,
+  logAudit('VIEW_SIGNALEMENT'),
+  getMyCreatedSignalements
 );
 
 // Get all signalements (filtered by role and village scope) - cache for 2 minutes

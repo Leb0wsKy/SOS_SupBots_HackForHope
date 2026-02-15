@@ -16,6 +16,7 @@ import villageRoutes from './routes/village.js';
 import adminRoutes from './routes/admin.js';
 import dpeRoutes from './routes/dpe.js';
 import level2Routes from './routes/level2.js';
+import historyRoutes from './routes/history.js';
 import { setSocketServer } from './services/socket.js';
 
 dotenv.config();
@@ -58,6 +59,7 @@ app.use('/api/villages', villageRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/dpe', dpeRoutes);
 app.use('/api/level2', level2Routes);
+app.use('/api/history', historyRoutes);
 
 
 // Basic route

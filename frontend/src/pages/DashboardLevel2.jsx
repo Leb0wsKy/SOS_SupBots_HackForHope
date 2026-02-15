@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  WidthType, AlignmentType, BorderStyle, HeadingLevel, ShadingType,
+} from 'docx';
+import {
   Bell,
   Clock,
   AlertTriangle,
@@ -17,6 +21,7 @@ import {
   ClipboardList,
   Activity,
   Shield,
+  History,
 } from 'lucide-react';
 import {
   getSignalements,
@@ -36,6 +41,8 @@ import {
 } from '../services/api';
 import BackgroundPattern from '../components/BackgroundPattern';
 import { Toast, useToast } from '../components/Toast';
+import ConfirmModal, { useConfirm } from '../components/ConfirmModal';
+import HistoryPanel from '../components/HistoryPanel';
 
 /* ═══════════════════════════════════════════════════════
    Constants
@@ -472,6 +479,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   const [showFullDpe, setShowFullDpe] = useState(false);
   const [previewFile, setPreviewFile] = useState(null); // { url, name, type }
   const [toast, showToast, dismissToast] = useToast();
+  const [confirmProps, showConfirm] = useConfirm();
   const [mlPrediction, setMlPrediction] = useState(null);
   const [showPredictionModal, setShowPredictionModal] = useState(false);
 
@@ -577,10 +585,12 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
 
     // Confirmation for destructive actions
     if (classification === 'FAUX_SIGNALEMENT') {
-      if (!window.confirm('⚠️ Êtes-vous sûr de marquer ce signalement comme FAUX ?\nCette action est irréversible.')) return;
+      const ok = await showConfirm({ title: 'Marquer comme faux', message: 'Êtes-vous sûr de marquer ce signalement comme FAUX ? Cette action est irréversible.', danger: true, confirmText: 'Marquer comme faux' });
+      if (!ok) return;
     }
     if (classification === 'PRISE_EN_CHARGE') {
-      if (!window.confirm('Ce signalement sera traité comme une prise en charge simple (sans workflow complet).\nConfirmer ?')) return;
+      const ok = await showConfirm({ title: 'Prise en charge simple', message: 'Ce signalement sera traité comme une prise en charge simple (sans workflow complet).', confirmText: 'Confirmer' });
+      if (!ok) return;
     }
 
     setActionLoading('cls');
@@ -639,7 +649,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
       const url = window.URL.createObjectURL(new Blob([data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `${templateName}.txt`);
+      link.setAttribute('download', `${templateName}.docx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -650,81 +660,83 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
     }
   };
 
-  /** Download the AI-generated DPE report as a formatted .txt file */
-  const handleDownloadGeneratedDPE = () => {
+  /** Download the AI-generated DPE report as a formatted .docx file */
+  const handleDownloadGeneratedDPE = async () => {
     const d = dpeResult?.draft;
     if (!d) return;
 
-    const sep = '═'.repeat(60);
-    const sub = '─'.repeat(60);
-    const lines = [
-      sep,
-      d.titre || 'Rapport DPE',
-      `SOS Villages d'Enfants Tunisie`,
-      `Généré le : ${new Date().toLocaleDateString('fr-FR')}`,
-      sep,
-      '',
-      sub,
-      '1. RÉSUMÉ DU SIGNALEMENT',
-      sub,
-      d.resume_signalement || '',
-      '',
-      sub,
-      '2. CONTEXTE',
-      sub,
-      d.contexte || '',
-      '',
-      sub,
-      '3. OBSERVATIONS',
-      sub,
-      d.observations || '',
-      '',
-      sub,
-      '4. ÉVALUATION DU RISQUE',
-      sub,
-      `Niveau : ${d.evaluation_risque?.niveau?.toUpperCase() || 'N/A'}`,
-      `Justification : ${d.evaluation_risque?.justification || 'N/A'}`,
-      '',
-      sub,
-      '5. RECOMMANDATIONS',
-      sub,
-      ...(Array.isArray(d.recommandations)
-        ? d.recommandations.map((r, i) => `  ${i + 1}. ${r}`)
-        : ['  Aucune']),
-      '',
-      sub,
-      "6. PLAN D'ACTION",
-      sub,
-      ...(Array.isArray(d.plan_action)
-        ? d.plan_action.map(
-            (a, i) =>
-              `  ${i + 1}. ${a.action}\n     Responsable : ${a.responsable}\n     Délai : ${a.delai}`
-          )
-        : ['  Aucun']),
-      '',
-      sub,
-      '7. SUIVI RECOMMANDÉ',
-      sub,
-      d.suivi || '',
-      '',
-      sub,
-      '8. POINTS À VÉRIFIER',
-      sub,
-      ...(Array.isArray(d.points_a_verifier)
-        ? d.points_a_verifier.map((p) => `  ☐ ${p}`)
-        : ['  Aucun']),
-      '',
-      sep,
-      d.disclaimer || 'Brouillon généré par IA — à valider par un professionnel.',
-      sep,
+    const SOS_BLUE = '1A73E8';
+    const SOS_NAVY = '1B2A4A';
+    const GRAY_C = '666666';
+    const thinBrd = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' };
+    const brd = { top: thinBrd, bottom: thinBrd, left: thinBrd, right: thinBrd };
+
+    const h1 = (t) => new Paragraph({ children: [new TextRun({ text: t, bold: true, color: SOS_NAVY, font: 'Calibri', size: 32 })], heading: HeadingLevel.HEADING_1, spacing: { before: 280, after: 120 } });
+    const h2 = (t) => new Paragraph({ children: [new TextRun({ text: t, bold: true, color: SOS_NAVY, font: 'Calibri', size: 26 })], heading: HeadingLevel.HEADING_2, spacing: { before: 240, after: 100 } });
+    const p = (t, opts = {}) => new Paragraph({ children: [new TextRun({ text: t || '', font: 'Calibri', size: 22, color: '333333', ...opts })], spacing: { after: 80 } });
+    const bl = () => new Paragraph({ spacing: { after: 120 } });
+    const tCell = (t, hdr = false) => new TableCell({
+      children: [new Paragraph({ children: [new TextRun({ text: t, font: 'Calibri', size: 20, bold: hdr, color: hdr ? 'FFFFFF' : '333333' })], alignment: AlignmentType.LEFT })],
+      width: { size: 3000, type: WidthType.DXA },
+      shading: hdr ? { type: ShadingType.CLEAR, fill: SOS_BLUE } : undefined,
+      borders: brd,
+    });
+
+    const children = [
+      h1(d.titre || 'Rapport DPE — Diagnostic Psycho-Éducatif'),
+      p(`SOS Villages d'Enfants Tunisie`, { italics: true, color: GRAY_C }),
+      p(`Généré le : ${new Date().toLocaleDateString('fr-FR')}`, { color: GRAY_C }),
+      bl(),
+
+      h2('1. RÉSUMÉ DU SIGNALEMENT'),
+      p(d.resume_signalement || '—'),
+
+      h2('2. CONTEXTE'),
+      p(d.contexte || '—'),
+
+      h2('3. OBSERVATIONS'),
+      p(d.observations || '—'),
+
+      h2('4. ÉVALUATION DU RISQUE'),
+      p(`Niveau : ${d.evaluation_risque?.niveau?.toUpperCase() || 'N/A'}`, { bold: true }),
+      p(`Justification : ${d.evaluation_risque?.justification || 'N/A'}`),
+
+      h2('5. RECOMMANDATIONS'),
+      ...(Array.isArray(d.recommandations) && d.recommandations.length
+        ? d.recommandations.map((r, i) => p(`${i + 1}. ${r}`))
+        : [p('Aucune')]),
+
+      h2('6. PLAN D\'ACTION'),
+      ...(Array.isArray(d.plan_action) && d.plan_action.length ? [
+        new Table({
+          rows: [
+            new TableRow({ children: ['#', 'Action', 'Responsable', 'Délai'].map(h => tCell(h, true)) }),
+            ...d.plan_action.map((a, i) =>
+              new TableRow({ children: [tCell(`${i + 1}`), tCell(a.action || ''), tCell(a.responsable || ''), tCell(a.delai || '')] })
+            ),
+          ],
+          width: { size: 9000, type: WidthType.DXA },
+        }),
+      ] : [p('Aucun')]),
+
+      h2('7. SUIVI RECOMMANDÉ'),
+      p(d.suivi || '—'),
+
+      h2('8. POINTS À VÉRIFIER'),
+      ...(Array.isArray(d.points_a_verifier) && d.points_a_verifier.length
+        ? d.points_a_verifier.map(pt => p(`☐  ${pt}`))
+        : [p('Aucun')]),
+
+      bl(),
+      p(d.disclaimer || 'Brouillon généré par IA — à valider par un professionnel qualifié.', { italics: true, color: GRAY_C }),
     ];
 
-    const text = lines.join('\n');
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = window.URL.createObjectURL(blob);
+    const doc = new Document({ sections: [{ children }] });
+    const buffer = await Packer.toBlob(doc);
+    const url = window.URL.createObjectURL(buffer);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `rapport-dpe-genere-${item._id?.slice(-6) || 'draft'}.txt`);
+    link.setAttribute('download', `rapport-dpe-genere-${item._id?.slice(-6) || 'draft'}.docx`);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -753,7 +765,8 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   /** Close the workflow — all 6 stages must be done */
   const handleCloseWorkflow = async () => {
     if (!wf?._id) return;
-    const reason = prompt('Raison de clôture (optionnel) :');
+    const reason = await showConfirm({ title: 'Clôturer le dossier', message: 'Le dossier sera soumis au Directeur Village pour signature.', withInput: true, inputLabel: 'Raison de clôture (optionnel)', inputPlaceholder: 'Saisissez la raison…', confirmText: 'Clôturer' });
+    if (reason === false) return;
     setActionLoading('close');
     try {
       await closeWorkflow(wf._id, reason || undefined);
@@ -1398,6 +1411,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
 
       {/* Toast notification */}
       <Toast toast={toast} onDismiss={dismissToast} />
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 };
@@ -1412,6 +1426,7 @@ function DashboardLevel2() {
   const [search, setSearch] = useState('');
   const [filterUrgency, setFilterUrgency] = useState('');
   const [mainToast, showMainToast, dismissMainToast] = useToast();
+  const [dashboardView, setDashboardView] = useState('main'); // 'main' | 'history'
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -1491,6 +1506,17 @@ function DashboardLevel2() {
             <div className="flex items-center gap-3">
               <NotificationBell items={signalements} onClickItem={setSelected} />
               <button
+                onClick={() => setDashboardView(dashboardView === 'main' ? 'history' : 'main')}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg font-medium transition cursor-pointer ${
+                  dashboardView === 'history'
+                    ? 'bg-sos-blue text-white'
+                    : 'bg-sos-gray-100 text-sos-gray-600 hover:bg-sos-gray-200'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                Historique
+              </button>
+              <button
                 onClick={fetchData}
                 disabled={loading}
                 className="px-3 py-2 text-sm bg-sos-blue text-white rounded-lg font-medium hover:bg-sos-blue-dark transition disabled:opacity-60"
@@ -1501,6 +1527,7 @@ function DashboardLevel2() {
           </div>
 
           {/* Quick stats */}
+          {dashboardView === 'main' && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
             {[
               { label: 'Total', value: statCounts.total, color: 'text-sos-blue', bg: 'bg-sos-blue-light' },
@@ -1514,10 +1541,19 @@ function DashboardLevel2() {
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
 
+      {/* ── History View ── */}
+      {dashboardView === 'history' && (
+        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <HistoryPanel />
+        </div>
+      )}
+
       {/* ── Filters ── */}
+      {dashboardView === 'main' && (
       <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex flex-col sm:flex-row gap-3 mb-4">
           {/* Search */}
@@ -1610,6 +1646,7 @@ function DashboardLevel2() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Detail Drawer ── */}
       {selected && (
