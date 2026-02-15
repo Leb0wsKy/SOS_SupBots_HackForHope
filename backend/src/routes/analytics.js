@@ -6,7 +6,7 @@ import {
   exportData
 } from '../controllers/analyticsController.js';
 import { protect } from '../middleware/auth.js';
-import { requireLevel3 } from '../middleware/roles.js';
+import { requireLevel2 } from '../middleware/roles.js';
 import { logAudit } from '../middleware/auditLog.js';
 import { cacheMiddleware, analyticsCacheKey } from '../middleware/cache.js';
 
@@ -14,7 +14,7 @@ const router = express.Router();
 
 // All analytics routes require Level 3
 router.use(protect);
-router.use(requireLevel3);
+router.use(requireLevel2);
 
 // Global analytics - cache for 5 minutes (300 seconds)
 router.get('/', logAudit('ACCESS_ANALYTICS'), cacheMiddleware(300, analyticsCacheKey), getAnalytics);

@@ -10,6 +10,11 @@ const ROLE_HOME = {
   LEVEL4: '/dashboard-level4',
 };
 
+const ROLE_DETAILS_HOME = {
+  VILLAGE_DIRECTOR: '/dashboard-directeur',
+  NATIONAL_OFFICE: '/dashboard-national',
+};
+
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,7 +31,7 @@ function Login() {
       const { data } = await login(email, password);
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      navigate(ROLE_HOME[data.user.role] || '/dashboard-level1');
+      navigate(ROLE_DETAILS_HOME[data.user.roleDetails] || ROLE_HOME[data.user.role] || '/dashboard-level1');
     } catch (err) {
       setError(err.response?.data?.message || 'Identifiants invalides');
     } finally {

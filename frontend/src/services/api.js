@@ -48,6 +48,12 @@ export const createSignalement = (formData) =>
 
 export const getSignalements = () => api.get('/signalements');
 
+export const closeSignalement = (id, closureReason) =>
+  api.put(`/signalements/${id}/close`, { closureReason });
+
+export const archiveSignalement = (id) =>
+  api.put(`/signalements/${id}/archive`);
+
 export const sauvegarderSignalement = (id) => 
   api.put(`/signalements/${id}/sauvegarder`);
 

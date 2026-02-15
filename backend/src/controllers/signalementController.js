@@ -32,7 +32,7 @@ const enforceVillageScope = (req, signalement) => {
   const signalementVillageId = String(signalement.village?._id || signalement.village);
   const userVillageId = String(req.user.village?._id || req.user.village || '');
 
-  if (role === 'LEVEL3' && roleDetails === 'VILLAGE_DIRECTOR') {
+  if (roleDetails === 'VILLAGE_DIRECTOR') {
     return signalementVillageId === userVillageId ? null : 'Village scope violation';
   }
 
@@ -199,7 +199,7 @@ export const getSignalements = async (req, res) => {
         filter.village = userVillage;
         delete filter.$or; // Remove $or when filtering by specific village
       }
-    } else if (req.user.role === 'LEVEL3' && req.user.roleDetails === 'VILLAGE_DIRECTOR') {
+    } else if (req.user.roleDetails === 'VILLAGE_DIRECTOR') {
       filter.village = req.user.village?._id || req.user.village;
     }
     // Level 3 (national) and Level 4 see all
