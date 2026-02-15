@@ -21,6 +21,8 @@ import {
   FileText,
   Archive,
   ChevronRight,
+  PenTool,
+  Send,
 } from 'lucide-react';
 import {
   getAnalytics,
@@ -279,6 +281,39 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
             </div>
           )}
 
+          {/* Director Signature Section */}
+          {item.directorSignature?.signedAt && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <PenTool className="w-4 h-4 text-sos-blue" />
+                <p className="text-xs font-bold text-sos-blue uppercase tracking-wide">Signature du Directeur</p>
+              </div>
+              <p className="text-sm font-medium text-sos-gray-800">{item.directorSignature.signedBy?.name || 'Directeur'}</p>
+              {item.directorSignature.signatureType === 'STAMP' && item.directorSignature.signatureData && (
+                <div className="bg-white border border-blue-100 rounded-lg p-3">
+                  <p className="text-xs text-sos-gray-600 italic whitespace-pre-line">{item.directorSignature.signatureData}</p>
+                </div>
+              )}
+              {item.directorSignature.signatureType === 'IMAGE' && item.directorSignature.signatureData && (
+                <div className="bg-white border border-blue-100 rounded-lg p-3 flex justify-center">
+                  <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/uploads/${item.directorSignature.signatureData}`}
+                       alt="Signature" className="max-h-24 object-contain" />
+                </div>
+              )}
+              <p className="text-[10px] text-sos-gray-400">Signé le {fmtDate(item.directorSignature.signedAt)}</p>
+            </div>
+          )}
+
+          {item.forwardedToNational && item.forwardedAt && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center gap-2">
+                <Send className="w-4 h-4 text-sos-green" />
+                <p className="text-xs font-bold text-sos-green uppercase tracking-wide">Dossier transmis au National</p>
+              </div>
+              <p className="text-[10px] text-sos-gray-400 mt-1">Reçu le {fmtDate(item.forwardedAt)}</p>
+            </div>
+          )}
+
           {item.attachments?.length > 0 && (
             <div>
               <p className="text-xs font-bold text-sos-gray-700 uppercase tracking-wide mb-2">Pièces jointes</p>
@@ -375,7 +410,7 @@ export default function DashboardNational() {
   const [signalements, setSignalements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const [activeView, setActiveView] = useState('analytics'); // analytics | escalated | all
+  const [activeView, setActiveView] = useState('forwarded'); // forwarded | analytics | escalated | all
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [exporting, setExporting] = useState(false);
 
@@ -421,6 +456,7 @@ export default function DashboardNational() {
 
   const escalated = signalements.filter(s => s.escalated);
   const allActive = signalements.filter(s => ['EN_ATTENTE', 'EN_COURS'].includes(s.status));
+  const forwardedDossiers = signalements.filter(s => s.forwardedToNational === true);
 
   if (loading) {
     return (
@@ -466,9 +502,10 @@ export default function DashboardNational() {
           {/* View switcher */}
           <div className="flex gap-6 mt-4">
             {[
+              { key: 'forwarded', label: `Dossiers signés (${forwardedDossiers.length})` },
               { key: 'analytics', label: 'Analyse' },
               { key: 'escalated', label: `Escaladés (${escalated.length})` },
-              { key: 'all', label: `Signalements actifs (${allActive.length})` },
+              { key: 'all', label: `Tous actifs (${allActive.length})` },
             ].map(v => (
               <button key={v.key} onClick={() => setActiveView(v.key)}
                 className={`pb-3 text-sm font-medium border-b-2 transition cursor-pointer ${
@@ -631,6 +668,23 @@ export default function DashboardNational() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {allActive.map(s => <SignalementCard key={s._id} item={s} onClick={() => setSelected(s)} />)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Forwarded signed dossiers view */}
+        {activeView === 'forwarded' && (
+          <div>
+            {forwardedDossiers.length === 0 ? (
+              <div className="text-center py-16">
+                <CheckCircle2 className="w-16 h-16 text-sos-gray-300 mx-auto mb-4" />
+                <p className="text-lg text-sos-gray-500">Aucun dossier signé reçu</p>
+                <p className="text-sm text-sos-gray-400 mt-1">Les dossiers signés par les directeurs de village apparaîtront ici.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {forwardedDossiers.map(s => <SignalementCard key={s._id} item={s} onClick={() => setSelected(s)} />)}
               </div>
             )}
           </div>

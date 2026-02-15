@@ -11,7 +11,9 @@ import {
   downloadAttachment,
   sauvegarderSignalement,
   markAsFaux,
-  getMySignalementsWithDeadlines
+  getMySignalementsWithDeadlines,
+  directorSign,
+  directorForward
 } from '../controllers/signalementController.js';
 import { protect } from '../middleware/auth.js';
 import { 
@@ -115,6 +117,23 @@ router.put('/:id/archive',
   logAudit('UPDATE_SIGNALEMENT', 'Signalement'),
   invalidateCache(['cache:signalements:*', 'cache:analytics:*']),
   archiveSignalement
+);
+
+// Director Village — sign dossier (VILLAGE_DIRECTOR only)
+router.post('/:id/director/sign',
+  requireLevel2,
+  upload.single('signatureImage'),
+  logAudit('UPDATE_SIGNALEMENT', 'Signalement'),
+  invalidateCache(['cache:signalements:*', 'cache:analytics:*']),
+  directorSign
+);
+
+// Director Village — forward signed dossier to national
+router.post('/:id/director/forward',
+  requireLevel2,
+  logAudit('UPDATE_SIGNALEMENT', 'Signalement'),
+  invalidateCache(['cache:signalements:*', 'cache:analytics:*']),
+  directorForward
 );
 
 // Delete signalement (Level 3 only)

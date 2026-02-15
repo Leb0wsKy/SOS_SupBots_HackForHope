@@ -392,6 +392,26 @@ const signalementSchema = new mongoose.Schema({
   closureReason: {
     type: String
   },
+
+  // ── Director Village review & signature ──
+  directorReviewStatus: {
+    type: String,
+    enum: ['PENDING', 'SIGNED', 'FORWARDED', null],
+    default: null
+  },
+  directorSignature: {
+    signedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    signedAt: Date,
+    signatureType: { type: String, enum: ['STAMP', 'IMAGE'] },
+    signatureData: String   // base64 stamp text or filename of uploaded PNG
+  },
+  forwardedToNational: { type: Boolean, default: false },
+  forwardedAt: Date,
+  nationalReviewStatus: {
+    type: String,
+    enum: ['PENDING', 'REVIEWED', null],
+    default: null
+  },
   
   // Archived by Level 3
   isArchived: {

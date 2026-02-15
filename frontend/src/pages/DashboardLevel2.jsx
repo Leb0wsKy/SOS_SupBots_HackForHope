@@ -582,7 +582,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
     setActionLoading('close');
     try {
       await closeWorkflow(wf._id, reason || undefined);
-      alert('✅ Signalement clôturé avec succès! Le créateur Level 1 a été notifié.');
+      alert('✅ Dossier soumis au Directeur Village pour signature.');
       await fetchWorkflow();
       onRefresh();
     } catch (error) {
@@ -1082,35 +1082,35 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
 
               {/* Closure button — only when all 6 stages are COMPLETED */}
               {(wf.currentStage === 'COMPLETED' || completedStageCount(wf) === STAGE_ORDER.length) && wf.status === 'ACTIVE' && (
-                <div className="mt-4 p-3 bg-sos-green-light border border-green-200 rounded-lg space-y-2">
-                  <p className="text-sm font-semibold text-sos-green flex items-center gap-1.5">
+                <div className="mt-4 p-3 bg-sos-blue-light border border-blue-200 rounded-lg space-y-2">
+                  <p className="text-sm font-semibold text-sos-blue flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4" />
                     Toutes les 6 étapes sont complétées
                   </p>
                   <p className="text-xs text-sos-gray-600">
-                    Vous pouvez maintenant clôturer ce signalement. Une notification sera envoyée au créateur Level 1.
+                    Soumettez ce dossier au Directeur Village pour signature et validation.
                   </p>
                   <button
                     onClick={handleCloseWorkflow}
                     disabled={actionLoading === 'close'}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sos-green text-white text-sm font-medium
-                               hover:bg-green-700 transition disabled:opacity-60 cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sos-blue text-white text-sm font-medium
+                               hover:bg-sos-blue-dark transition disabled:opacity-60 cursor-pointer"
                   >
-                    {actionLoading === 'close' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                    Clôturer le signalement
+                    {actionLoading === 'close' ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
+                    Soumettre au Directeur Village
                   </button>
                 </div>
               )}
 
               {/* Already closed */}
               {wf.status === 'COMPLETED' && wf.closedAt && (
-                <div className="mt-3 p-3 bg-sos-green-light border border-green-200 rounded-lg">
-                  <p className="text-xs font-semibold text-sos-green flex items-center gap-1.5">
+                <div className="mt-3 p-3 bg-sos-blue-light border border-blue-200 rounded-lg">
+                  <p className="text-xs font-semibold text-sos-blue flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Clôturé le {new Date(wf.closedAt).toLocaleString('fr-FR')}
+                    Soumis au Directeur Village le {new Date(wf.closedAt).toLocaleString('fr-FR')}
                   </p>
                   {wf.closureReason && (
-                    <p className="text-xs text-sos-gray-600 mt-1">Raison : {wf.closureReason}</p>
+                    <p className="text-xs text-sos-gray-600 mt-1">Note : {wf.closureReason}</p>
                   )}
                 </div>
               )}

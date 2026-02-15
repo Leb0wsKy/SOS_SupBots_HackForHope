@@ -527,25 +527,24 @@ export const closeWorkflow = async (req, res) => {
     workflow.closureReason = reason || 'Toutes les étapes complétées';
     await workflow.save();
 
-    // Update signalement status to CLOTURE
+    // Submit dossier to Director Village for signature (do NOT close)
     const signalement = await Signalement.findById(workflow.signalement);
     if (signalement) {
-      signalement.status = 'CLOTURE';
-      signalement.closedBy = req.user.id;
-      signalement.closedAt = now;
-      signalement.closureReason = reason || 'Workflow terminé — toutes les étapes complétées';
+      // Mark as ready for Director Village signature
+      if (!signalement.directorReviewStatus) {
+        signalement.directorReviewStatus = 'PENDING';
+      }
       await signalement.save();
 
-      // Notify Level 1 (the original creator) about closure
-      emitEvent('signalement.closed', {
+      // Notify Director Village that a dossier is ready
+      emitEvent('dossier.readyForDirector', {
         id: signalement._id,
-        closedBy: req.user.id,
         village: signalement.village,
-        createdBy: signalement.createdBy
+        submittedBy: req.user.id
       });
     }
 
-    res.json({ success: true, message: 'Signalement clôturé avec succès', workflow });
+    res.json({ success: true, message: 'Dossier soumis au Directeur Village pour signature.', workflow });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
