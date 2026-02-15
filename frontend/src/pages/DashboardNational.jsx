@@ -322,7 +322,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
                     )}
                     {sig.signatureType === 'IMAGE' && sig.signatureData && (
                       <div className="bg-white border border-blue-100 rounded-lg p-3 flex justify-center">
-                        <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/uploads/${sig.signatureData}`}
+                        <img src={`${import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://sos-supbots-backend-4484b02ee4b5.herokuapp.com')}/uploads/${sig.signatureData}`}
                              alt="Signature" className="max-h-24 object-contain" />
                       </div>
                     )}
@@ -348,7 +348,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
               )}
               {item.directorSignature.signatureType === 'IMAGE' && item.directorSignature.signatureData && (
                 <div className="bg-white border border-blue-100 rounded-lg p-3 flex justify-center">
-                  <img src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/uploads/${item.directorSignature.signatureData}`}
+                  <img src={`${import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://sos-supbots-backend-4484b02ee4b5.herokuapp.com')}/uploads/${item.directorSignature.signatureData}`}
                        alt="Signature" className="max-h-24 object-contain" />
                 </div>
               )}
