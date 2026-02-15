@@ -30,7 +30,7 @@ const ROLE_LABELS = {
 };
 
 const navLinks = [
-  { to: '/dashboard-level1', label: 'Signalement', roles: ['LEVEL1', 'LEVEL2', 'LEVEL3', 'LEVEL4'], icon: Home },
+  { to: '/dashboard-level1', label: 'Signalement', roles: ['LEVEL1', 'LEVEL3', 'LEVEL4'], icon: Home },
   { to: '/dashboard-level2', label: 'Traitement', roles: ['LEVEL2', 'LEVEL3', 'LEVEL4'] },
   { to: '/dashboard-level3', label: 'Gouvernance', roles: ['LEVEL3', 'LEVEL4'] },
   { to: '/dashboard-level4', label: 'Admin', roles: ['LEVEL4'] },
