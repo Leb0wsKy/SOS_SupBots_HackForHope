@@ -18,8 +18,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Auth
-export const login = (email, password) => 
+// Auto-logout on 401
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
+/* ── Auth ── */
+export const login = (email, password) =>
   api.post('/auth/login', { email, password });
 
 export const getProfile = () => api.get('/auth/profile');
