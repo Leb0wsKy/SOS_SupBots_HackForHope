@@ -43,6 +43,9 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve uploaded files (signatures, attachments)
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Database connection
 connectDB();
 

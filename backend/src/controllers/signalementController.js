@@ -186,9 +186,22 @@ export const getSignalements = async (req, res) => {
       .populate('village', 'name location region')
       .populate('assignedTo', 'name email')
       .populate('classifiedBy', 'name')
+      .populate('directorSignature.signedBy', 'name email')
       .populate('workflow', 'currentStage status stages assignedTo classification')
       .populate('workflowRef', 'currentStage status stages assignedTo classification')
       .sort({ createdAt: -1 });
+
+    // Auto-backfill directorReviewStatus for closed signalements that predate the feature
+    const backfillOps = signalements.filter(
+      s => s.status === 'CLOTURE' && !s.directorReviewStatus && !s.isArchived
+    );
+    if (backfillOps.length > 0) {
+      await Signalement.updateMany(
+        { _id: { $in: backfillOps.map(s => s._id) } },
+        { $set: { directorReviewStatus: 'PENDING' } }
+      );
+      backfillOps.forEach(s => { s.directorReviewStatus = 'PENDING'; });
+    }
 
     const masked = signalements.map(maskAnonymousSignalement);
 
@@ -439,9 +452,8 @@ export const downloadAttachment = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    if (req.user.role === 'LEVEL2') {
-      // For EN_ATTENTE signalements, village scope check is enough
-      // For assigned signalements, verify the user is the assignee
+    if (req.user.role === 'LEVEL2' && req.user.roleDetails !== 'VILLAGE_DIRECTOR') {
+      // For non-director L2: verify the user is the assignee
       if (signalement.assignedTo && signalement.assignedTo.toString() !== req.user.id) {
         return res.status(403).json({ message: 'Access denied' });
       }
@@ -697,6 +709,94 @@ export const getMySignalementsWithDeadlines = async (req, res) => {
       count: signalementsWithStatus.length,
       signalements: signalementsWithStatus
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+/* ══════════════════════════════════════════════════════
+   Director Village — Sign dossier
+   ══════════════════════════════════════════════════════ */
+export const directorSign = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { signatureType } = req.body; // 'STAMP' or 'IMAGE'
+
+    const signalement = await Signalement.findById(id);
+    if (!signalement) return res.status(404).json({ message: 'Signalement not found' });
+
+    // Only allow signing once
+    if (signalement.directorReviewStatus === 'SIGNED' || signalement.directorReviewStatus === 'FORWARDED') {
+      return res.status(400).json({ message: 'Ce dossier a déjà été signé.' });
+    }
+
+    // Village scope check
+    const scopeError = enforceVillageScope(req, signalement);
+    if (scopeError) return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+
+    const type = signatureType === 'IMAGE' ? 'IMAGE' : 'STAMP';
+    let signatureData;
+
+    if (type === 'IMAGE' && req.file) {
+      signatureData = req.file.filename; // stored in uploads/
+    } else {
+      // Stamp: name + role + date
+      signatureData = `Signé par ${req.user.name} — Directeur Village — ${new Date().toLocaleDateString('fr-FR')}`;
+    }
+
+    signalement.directorReviewStatus = 'SIGNED';
+    signalement.directorSignature = {
+      signedBy: req.user.id,
+      signedAt: new Date(),
+      signatureType: type,
+      signatureData
+    };
+
+    await signalement.save();
+
+    await signalement.populate('village', 'name location region');
+    await signalement.populate('directorSignature.signedBy', 'name email');
+
+    res.json({ message: 'Dossier signé avec succès.', signalement });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+/* ══════════════════════════════════════════════════════
+   Director Village — Forward signed dossier to National
+   ══════════════════════════════════════════════════════ */
+export const directorForward = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const signalement = await Signalement.findById(id);
+    if (!signalement) return res.status(404).json({ message: 'Signalement not found' });
+
+    if (signalement.directorReviewStatus !== 'SIGNED') {
+      return res.status(400).json({ message: 'Le dossier doit être signé avant d\'être envoyé au Responsable National.' });
+    }
+
+    const scopeError = enforceVillageScope(req, signalement);
+    if (scopeError) return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+
+    signalement.directorReviewStatus = 'FORWARDED';
+    signalement.forwardedToNational = true;
+    signalement.forwardedAt = new Date();
+    signalement.nationalReviewStatus = 'PENDING';
+
+    await signalement.save();
+
+    await signalement.populate('village', 'name location region');
+
+    // Notify Responsable National
+    emitEvent('dossier.forwarded', {
+      id: signalement._id,
+      village: signalement.village?._id || signalement.village,
+      forwardedBy: req.user.id
+    });
+
+    res.json({ message: 'Dossier envoyé au Responsable National de Sauvegarde.', signalement });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

@@ -48,6 +48,13 @@ const resolveTargets = (event, payload) => {
     case 'signalement.assigned':
       if (!payload?.assignedTo) return [];
       return [roomForUser(String(payload.assignedTo))];
+    case 'dossier.forwarded':
+      // Notify Responsable National Sauvegarde
+      return [roomForRoleDetails('NATIONAL_OFFICE')];
+    case 'dossier.readyForDirector':
+      // Notify Village Director that a dossier is ready for signature
+      if (!villageId) return [];
+      return [roomForRoleDetailsVillage('VILLAGE_DIRECTOR', villageId)];
     default:
       return [];
   }

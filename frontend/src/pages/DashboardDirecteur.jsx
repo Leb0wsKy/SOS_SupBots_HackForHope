@@ -7,26 +7,29 @@ import {
   Activity,
   Shield,
   FileWarning,
-  Users,
   RefreshCw,
   Download,
   Loader2,
   X,
   Eye,
   FileText,
-  ArrowUpRight,
-  ArrowDownRight,
-  Building2,
   Archive,
   ChevronRight,
+  PenTool,
+  Send,
+  Upload,
+  Stamp,
+  FileCheck,
 } from 'lucide-react';
 import {
   getAnalytics,
   getSignalements,
-  closeSignalement,
   archiveSignalement,
   exportData,
   downloadAttachment,
+  directorSignDossier,
+  directorForwardDossier,
+  getDPEDraft,
 } from '../services/api';
 
 /* ═══════════════════════════════════════════════════════
@@ -46,6 +49,12 @@ const STATUS_MAP = {
   FAUX_SIGNALEMENT: { label: 'Faux signalement',  color: 'text-sos-gray-500', bg: 'bg-sos-gray-100' },
 };
 
+const DIRECTOR_STATUS = {
+  PENDING:   { label: 'En attente de signature', color: 'text-yellow-700', bg: 'bg-sos-yellow-light', icon: Clock },
+  SIGNED:    { label: 'Signé',                   color: 'text-sos-blue',   bg: 'bg-sos-blue-light',   icon: PenTool },
+  FORWARDED: { label: 'Envoyé au national',      color: 'text-sos-green',  bg: 'bg-sos-green-light',  icon: Send },
+};
+
 const INCIDENT_LABELS = {
   VIOLENCE_PHYSIQUE: 'Violence physique',
   VIOLENCE_PSYCHOLOGIQUE: 'Violence psycho.',
@@ -58,8 +67,8 @@ const INCIDENT_LABELS = {
   AUTRE: 'Autre',
 };
 
-const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-const fmtShort = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const fmtShort = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—';
 
 /* ═══════════════════════════════════════════════════════
    Sub-components
@@ -90,74 +99,102 @@ const HorizontalBar = ({ value, max, color = 'bg-sos-blue' }) => {
 };
 
 /* ═══════════════════════════════════════════════════════
-   Signalement Detail Drawer
+   Signalement Detail Drawer with Signing
    ═══════════════════════════════════════════════════════ */
 const DetailDrawer = ({ item, onClose, onRefresh }) => {
   const [actionLoading, setActionLoading] = useState('');
   const [previewFile, setPreviewFile] = useState(null);
+  const [signMode, setSignMode] = useState(null); // null | 'STAMP' | 'IMAGE'
+  const [sigImage, setSigImage] = useState(null);
+  const [dpeContent, setDpeContent] = useState(null);
 
   if (!item) return null;
 
   const urg = URGENCY[item.urgencyLevel] || URGENCY.FAIBLE;
   const st = STATUS_MAP[item.status] || STATUS_MAP.EN_ATTENTE;
+  const ds = DIRECTOR_STATUS[item.directorReviewStatus] || null;
 
-  const handleClose = async () => {
-    const reason = prompt('Raison de la clôture :');
-    if (!reason) return;
-    setActionLoading('close');
+  const hasDpeFinal = !!item.reports?.dpeFinal?.metadata?.submittedAt;
+  const canSign = item.directorReviewStatus === 'PENDING';
+  const canForward = item.directorReviewStatus === 'SIGNED';
+
+  /* ── Actions ── */
+  const handleSign = async (type) => {
+    setActionLoading('sign');
     try {
-      await closeSignalement(item._id, reason);
-      alert('✅ Signalement clôturé.');
+      await directorSignDossier(item._id, type, type === 'IMAGE' ? sigImage : null);
+      alert('✅ Dossier signé avec succès.');
+      setSignMode(null);
+      setSigImage(null);
       onRefresh();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de la clôture.');
+      alert(err.response?.data?.message || 'Erreur lors de la signature.');
+    }
+    setActionLoading('');
+  };
+
+  const handleForward = async () => {
+    if (!confirm('Envoyer ce dossier signé au Responsable National de Sauvegarde ?')) return;
+    setActionLoading('forward');
+    try {
+      await directorForwardDossier(item._id);
+      alert('✅ Dossier envoyé au Responsable National.');
+      onRefresh();
+    } catch (err) {
+      alert(err.response?.data?.message || "Erreur lors de l'envoi.");
     }
     setActionLoading('');
   };
 
   const handleArchive = async () => {
-    if (!confirm('Archiver ce signalement ? Cette action est irréversible.')) return;
+    if (!confirm('Archiver ce signalement ?')) return;
     setActionLoading('archive');
     try {
       await archiveSignalement(item._id);
       alert('✅ Signalement archivé.');
       onRefresh();
     } catch (err) {
-      alert(err.response?.data?.message || 'Erreur lors de l\'archivage.');
+      alert(err.response?.data?.message || "Erreur lors de l'archivage.");
     }
     setActionLoading('');
+  };
+
+  const loadDpe = async () => {
+    try {
+      const { data } = await getDPEDraft(item._id);
+      setDpeContent(data.draft || data.content || data);
+    } catch { /* */ }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white shadow-2xl overflow-y-auto animate-slide-in-right">
+      <div className="relative w-full max-w-lg bg-white shadow-2xl overflow-y-auto animate-slide-in-right">
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-sos-gray-200 px-5 py-4 flex items-center justify-between z-10">
-          <h2 className="text-lg font-bold text-sos-gray-900">Détail du signalement</h2>
+          <h2 className="text-lg font-bold text-sos-gray-900">Détail du dossier</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-sos-gray-100 transition cursor-pointer">
             <X className="w-5 h-5 text-sos-gray-600" />
           </button>
         </div>
 
         <div className="p-5 space-y-5">
-          {/* Status + Urgency */}
-          <div className="flex items-center gap-2">
+          {/* Badges */}
+          <div className="flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${urg.bg} ${urg.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${urg.dot}`} />
-              {urg.label}
+              <span className={`w-1.5 h-1.5 rounded-full ${urg.dot}`} /> {urg.label}
             </span>
             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${st.bg} ${st.color}`}>
               {st.label}
             </span>
-            {item.escalated && (
-              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-sos-red-light text-sos-red">
-                ⚠ Escaladé
+            {ds && (
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${ds.bg} ${ds.color}`}>
+                <ds.icon className="w-3 h-3" /> {ds.label}
               </span>
             )}
           </div>
 
-          {/* Title + meta */}
+          {/* Title */}
           <div>
             <h3 className="text-xl font-bold text-sos-gray-900">{item.title || item.incidentType}</h3>
             <p className="text-sm text-sos-gray-500 mt-1">
@@ -174,127 +211,235 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
 
           {/* Details grid */}
           <div className="grid grid-cols-2 gap-4">
-            {item.childName && (
+            {item.childName && <div><p className="text-sos-gray-400 text-xs mb-0.5">Enfant</p><p className="font-medium text-sos-gray-800">{item.childName}</p></div>}
+            {item.createdBy && <div><p className="text-sos-gray-400 text-xs mb-0.5">Déclarant</p><p className="font-medium text-sos-gray-800">{item.createdBy?.name || '—'}</p></div>}
+            {item.assignedTo && <div><p className="text-sos-gray-400 text-xs mb-0.5">Psychologue</p><p className="font-medium text-sos-gray-800">{item.assignedTo?.name || '—'}</p></div>}
+            {item.classification && <div><p className="text-sos-gray-400 text-xs mb-0.5">Classification</p><p className="font-medium text-sos-gray-800">{item.classification}</p></div>}
+          </div>
+
+          {/* ── Documents section ── */}
+          <div className="bg-sos-gray-50 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-bold text-sos-gray-700 uppercase tracking-wide">Documents du dossier</p>
+
+            {/* Fiche initiale = attachments */}
+            {item.attachments?.length > 0 && (
               <div>
-                <p className="text-sos-gray-400 text-xs mb-0.5">Enfant</p>
-                <p className="font-medium text-sos-gray-800">{item.childName}</p>
+                <p className="text-xs text-sos-gray-500 mb-1.5">Pièces jointes / Fiche initiale</p>
+                <div className="space-y-1.5">
+                  {item.attachments.map((a, i) => {
+                    const mime = a.mimeType || '';
+                    const canPreview = mime.startsWith('image/') || mime === 'application/pdf';
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-sm bg-white rounded-lg px-3 py-2 border border-sos-gray-200">
+                        <FileText className="w-4 h-4 text-sos-blue shrink-0" />
+                        <span className="truncate flex-1 text-sos-gray-700">{a.originalName || a.filename}</span>
+                        {canPreview && (
+                          <button title="Aperçu" onClick={async () => {
+                            try {
+                              const { data } = await downloadAttachment(item._id, a.filename);
+                              const blob = new Blob([data], { type: mime });
+                              setPreviewFile({ url: URL.createObjectURL(blob), name: a.originalName || a.filename, type: mime });
+                            } catch { alert('Erreur aperçu.'); }
+                          }} className="p-1 rounded hover:bg-sos-blue-light transition cursor-pointer">
+                            <Eye className="w-4 h-4 text-sos-blue" />
+                          </button>
+                        )}
+                        <button title="Télécharger" onClick={async () => {
+                          try {
+                            const { data } = await downloadAttachment(item._id, a.filename);
+                            const url = URL.createObjectURL(new Blob([data]));
+                            const link = document.createElement('a'); link.href = url;
+                            link.setAttribute('download', a.originalName || a.filename);
+                            document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+                          } catch { alert('Erreur téléchargement.'); }
+                        }} className="p-1 rounded hover:bg-sos-blue-light transition cursor-pointer">
+                          <Download className="w-4 h-4 text-sos-blue" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
-            {item.childAge && (
+
+            {/* Rapport DPE */}
+            {hasDpeFinal ? (
               <div>
-                <p className="text-sos-gray-400 text-xs mb-0.5">Âge</p>
-                <p className="font-medium text-sos-gray-800">{item.childAge} ans</p>
+                <p className="text-xs text-sos-gray-500 mb-1.5">Rapport DPE (soumis le {fmtDate(item.reports.dpeFinal.metadata.submittedAt)})</p>
+                <button onClick={loadDpe}
+                  className="flex items-center gap-2 text-sm bg-white rounded-lg px-3 py-2 border border-sos-gray-200
+                             hover:bg-sos-blue-light transition cursor-pointer w-full">
+                  <FileCheck className="w-4 h-4 text-sos-green shrink-0" />
+                  <span className="text-sos-gray-700">Voir le rapport DPE Final</span>
+                  <Eye className="w-4 h-4 text-sos-blue ml-auto" />
+                </button>
+                {dpeContent && (
+                  <div className="mt-2 bg-white border border-sos-gray-200 rounded-lg p-4 max-h-60 overflow-y-auto text-xs text-sos-gray-700 space-y-2">
+                    {dpeContent.titre && <p className="font-bold text-sm">{dpeContent.titre}</p>}
+                    {dpeContent.resume_signalement && <p><span className="font-semibold">Résumé :</span> {dpeContent.resume_signalement}</p>}
+                    {dpeContent.observations && <p><span className="font-semibold">Observations :</span> {dpeContent.observations}</p>}
+                    {dpeContent.evaluation_risque?.niveau && (
+                      <p><span className="font-semibold">Risque :</span> {dpeContent.evaluation_risque.niveau} — {dpeContent.evaluation_risque.justification}</p>
+                    )}
+                    {dpeContent.recommandations?.length > 0 && (
+                      <div><span className="font-semibold">Recommandations :</span>
+                        <ul className="list-disc ml-4 mt-1">{dpeContent.recommandations.map((r, i) => <li key={i}>{r}</li>)}</ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-            {item.abuserName && (
-              <div>
-                <p className="text-sos-gray-400 text-xs mb-0.5">Agresseur présumé</p>
-                <p className="font-medium text-sos-gray-800">{item.abuserName}</p>
-              </div>
-            )}
-            {item.createdBy && (
-              <div>
-                <p className="text-sos-gray-400 text-xs mb-0.5">Déclarant</p>
-                <p className="font-medium text-sos-gray-800">{item.createdBy?.name || '—'}</p>
-              </div>
-            )}
-            {item.assignedTo && (
-              <div>
-                <p className="text-sos-gray-400 text-xs mb-0.5">Assigné à</p>
-                <p className="font-medium text-sos-gray-800">{item.assignedTo?.name || '—'}</p>
-              </div>
-            )}
-            {item.classification && (
-              <div>
-                <p className="text-sos-gray-400 text-xs mb-0.5">Classification</p>
-                <p className="font-medium text-sos-gray-800">{item.classification}</p>
-              </div>
+            ) : (
+              <p className="text-xs text-sos-gray-400 italic">Rapport DPE non encore soumis par le psychologue.</p>
             )}
           </div>
 
-          {/* Escalation note */}
-          {item.escalated && item.escalationNote && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <p className="text-xs font-bold text-sos-red uppercase tracking-wide mb-1">Note d'escalade</p>
-              <p className="text-sm text-sos-gray-700">{item.escalationNote}</p>
-              {item.escalatedAt && (
-                <p className="text-[10px] text-sos-gray-400 mt-2">Escaladé le {fmtDate(item.escalatedAt)}</p>
+          {/* ── Signature stamp / already signed ── */}
+          {item.directorSignature?.signedAt && (
+            <div className="space-y-3">
+              {/* Document overview with signature */}
+              <div className="bg-white border-2 border-sos-gray-200 rounded-xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-sos-gray-100">
+                  <FileCheck className="w-5 h-5 text-sos-blue" />
+                  <p className="text-sm font-bold text-sos-gray-800">Aperçu du dossier signé</p>
+                </div>
+
+                {/* Summary */}
+                <div className="space-y-2 mb-4 text-xs text-sos-gray-600">
+                  <div className="flex justify-between"><span className="font-medium text-sos-gray-500">Dossier</span><span className="font-semibold text-sos-gray-800">{item.title || item.incidentType}</span></div>
+                  <div className="flex justify-between"><span className="font-medium text-sos-gray-500">Village</span><span>{item.village?.name || '—'}</span></div>
+                  <div className="flex justify-between"><span className="font-medium text-sos-gray-500">Statut</span><span className="font-semibold text-sos-green">Clôturé & Signé</span></div>
+                  {item.assignedTo && <div className="flex justify-between"><span className="font-medium text-sos-gray-500">Psychologue</span><span>{item.assignedTo?.name || '—'}</span></div>}
+                  <div className="flex justify-between"><span className="font-medium text-sos-gray-500">Créé le</span><span>{fmtDate(item.createdAt)}</span></div>
+                </div>
+
+                {/* Signature block */}
+                <div className="border-t-2 border-dashed border-sos-blue/30 pt-4 mt-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PenTool className="w-4 h-4 text-sos-blue" />
+                    <p className="text-xs font-bold text-sos-blue uppercase tracking-wide">Signature électronique</p>
+                  </div>
+
+                  {item.directorSignature.signatureType === 'STAMP' ? (
+                    <div className="bg-sos-blue-light/50 border border-dashed border-sos-blue rounded-lg p-3 text-center">
+                      <p className="text-sm font-mono text-sos-gray-700 whitespace-pre-line">{item.directorSignature.signatureData}</p>
+                    </div>
+                  ) : (
+                    <div className="bg-sos-gray-50 border border-sos-gray-200 rounded-lg p-3 flex flex-col items-center gap-2">
+                      <img
+                        src={`http://localhost:5000/uploads/${item.directorSignature.signatureData}`}
+                        alt="Signature du directeur"
+                        className="max-h-24 object-contain"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <p className="text-xs text-sos-gray-500">Signature image — {item.directorSignature.signedBy?.name || 'Directeur'}</p>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-sos-gray-400 mt-2 text-right">
+                    Signé le {fmtDate(item.directorSignature.signedAt)} par {item.directorSignature.signedBy?.name || 'Directeur Village'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Forwarded info */}
+          {item.forwardedToNational && (
+            <div className="bg-sos-green-light border border-green-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Send className="w-4 h-4 text-sos-green" />
+                <p className="text-xs font-bold text-sos-green uppercase tracking-wide">Envoyé au Responsable National</p>
+              </div>
+              <p className="text-[10px] text-sos-gray-400">Le {fmtDate(item.forwardedAt)}</p>
+            </div>
+          )}
+
+          {/* ── Signing UI ── */}
+          {canSign && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3">
+              <p className="text-sm font-bold text-amber-800">Signature requise</p>
+              <p className="text-xs text-amber-700">
+                Veuillez signer ce dossier avant de l'envoyer au Responsable National.
+              </p>
+
+              {!signMode && (
+                <div className="flex gap-2">
+                  <button onClick={() => setSignMode('STAMP')}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                               bg-sos-blue text-white text-sm font-semibold hover:bg-sos-blue-dark transition cursor-pointer">
+                    <Stamp className="w-4 h-4" /> Tampon numérique
+                  </button>
+                  <button onClick={() => setSignMode('IMAGE')}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                               bg-white border border-sos-gray-300 text-sos-gray-700 text-sm font-semibold
+                               hover:bg-sos-gray-50 transition cursor-pointer">
+                    <Upload className="w-4 h-4" /> Image signature
+                  </button>
+                </div>
+              )}
+
+              {signMode === 'STAMP' && (
+                <div className="space-y-2">
+                  <div className="bg-white border border-dashed border-sos-blue rounded-lg p-3 text-center">
+                    <p className="text-sm font-mono text-sos-gray-700">
+                      Signé par {JSON.parse(localStorage.getItem('user') || '{}').name || 'Directeur'}<br />
+                      Directeur Village<br />
+                      {new Date().toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                  <button onClick={() => handleSign('STAMP')} disabled={!!actionLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                               bg-sos-blue text-white text-sm font-semibold hover:bg-sos-blue-dark transition
+                               disabled:opacity-60 cursor-pointer">
+                    {actionLoading === 'sign' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenTool className="w-4 h-4" />}
+                    Appliquer le tampon
+                  </button>
+                  <button onClick={() => setSignMode(null)} className="w-full text-xs text-sos-gray-500 hover:text-sos-gray-700 cursor-pointer">Annuler</button>
+                </div>
+              )}
+
+              {signMode === 'IMAGE' && (
+                <div className="space-y-2">
+                  <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-sos-gray-300
+                                    rounded-lg p-4 cursor-pointer hover:border-sos-blue transition">
+                    <Upload className="w-6 h-6 text-sos-gray-400" />
+                    <span className="text-xs text-sos-gray-500">{sigImage ? sigImage.name : 'Déposer une image PNG de signature'}</span>
+                    <input type="file" accept="image/png,image/jpeg" className="hidden"
+                      onChange={(e) => setSigImage(e.target.files[0] || null)} />
+                  </label>
+                  {sigImage && (
+                    <img src={URL.createObjectURL(sigImage)} alt="preview" className="mx-auto h-16 object-contain rounded border border-sos-gray-200" />
+                  )}
+                  <button onClick={() => handleSign('IMAGE')} disabled={!sigImage || !!actionLoading}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                               bg-sos-blue text-white text-sm font-semibold hover:bg-sos-blue-dark transition
+                               disabled:opacity-60 cursor-pointer">
+                    {actionLoading === 'sign' ? <Loader2 className="w-4 h-4 animate-spin" /> : <PenTool className="w-4 h-4" />}
+                    Signer avec l'image
+                  </button>
+                  <button onClick={() => { setSignMode(null); setSigImage(null); }} className="w-full text-xs text-sos-gray-500 hover:text-sos-gray-700 cursor-pointer">Annuler</button>
+                </div>
               )}
             </div>
           )}
 
-          {/* Attachments */}
-          {item.attachments?.length > 0 && (
-            <div>
-              <p className="text-xs font-bold text-sos-gray-700 uppercase tracking-wide mb-2">Pièces jointes</p>
-              <div className="space-y-1.5">
-                {item.attachments.map((a, i) => {
-                  const mime = a.mimeType || '';
-                  const canPreview = mime.startsWith('image/') || mime === 'application/pdf';
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-sm bg-sos-gray-50 rounded-lg px-3 py-2">
-                      <FileText className="w-4 h-4 text-sos-blue shrink-0" />
-                      <span className="truncate flex-1 text-sos-gray-700">{a.originalName || a.filename}</span>
-                      {canPreview && (
-                        <button title="Aperçu" onClick={async () => {
-                          try {
-                            const { data } = await downloadAttachment(item._id, a.filename);
-                            const blob = new Blob([data], { type: mime });
-                            setPreviewFile({ url: URL.createObjectURL(blob), name: a.originalName || a.filename, type: mime });
-                          } catch { alert('Erreur lors de l\'aperçu.'); }
-                        }} className="p-1 rounded hover:bg-sos-blue-light transition cursor-pointer">
-                          <Eye className="w-4 h-4 text-sos-blue" />
-                        </button>
-                      )}
-                      <button title="Télécharger" onClick={async () => {
-                        try {
-                          const { data } = await downloadAttachment(item._id, a.filename);
-                          const url = URL.createObjectURL(new Blob([data]));
-                          const link = document.createElement('a'); link.href = url;
-                          link.setAttribute('download', a.originalName || a.filename);
-                          document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
-                        } catch { alert('Erreur lors du téléchargement.'); }
-                      }} className="p-1 rounded hover:bg-sos-blue-light transition cursor-pointer">
-                        <Download className="w-4 h-4 text-sos-blue" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Closure info */}
-          {item.status === 'CLOTURE' && item.closedAt && (
-            <div className="bg-sos-green-light border border-green-200 rounded-xl p-4">
-              <p className="text-xs font-bold text-sos-green uppercase tracking-wide mb-1">Clôturé</p>
-              <p className="text-sm text-sos-gray-700">{item.closureReason || 'Aucune raison spécifiée'}</p>
-              <p className="text-[10px] text-sos-gray-400 mt-1">Le {fmtDate(item.closedAt)}</p>
-            </div>
-          )}
-
-          {/* Actions */}
+          {/* ── Actions ── */}
           <div className="pt-4 border-t border-sos-gray-200 space-y-2">
-            {item.status === 'EN_COURS' && (
-              <button
-                onClick={handleClose}
-                disabled={!!actionLoading}
+            {canForward && (
+              <button onClick={handleForward} disabled={!!actionLoading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-                           bg-sos-green text-white text-sm font-semibold
-                           hover:bg-green-700 transition disabled:opacity-60 cursor-pointer"
-              >
-                {actionLoading === 'close' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                Clôturer le signalement
+                           bg-sos-green text-white text-sm font-semibold hover:bg-green-700 transition
+                           disabled:opacity-60 cursor-pointer">
+                {actionLoading === 'forward' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Signer & Envoyer au Responsable National
               </button>
             )}
             {item.status === 'CLOTURE' && !item.isArchived && (
-              <button
-                onClick={handleArchive}
-                disabled={!!actionLoading}
+              <button onClick={handleArchive} disabled={!!actionLoading}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                            bg-sos-gray-200 text-sos-gray-700 text-sm font-semibold
-                           hover:bg-sos-gray-300 transition disabled:opacity-60 cursor-pointer"
-              >
+                           hover:bg-sos-gray-300 transition disabled:opacity-60 cursor-pointer">
                 {actionLoading === 'archive' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
                 Archiver
               </button>
@@ -322,7 +467,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
             <div className="flex-1 overflow-auto p-2 bg-sos-gray-50 flex items-center justify-center">
               {previewFile.type === 'application/pdf' ? (
                 <iframe src={previewFile.url} className="w-full h-full rounded-lg" title={previewFile.name} />
-              ) : previewFile.type.startsWith('image/') ? (
+              ) : previewFile.type?.startsWith('image/') ? (
                 <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain rounded-lg" />
               ) : null}
             </div>
@@ -338,26 +483,22 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
    ═══════════════════════════════════════════════════════ */
 const SignalementCard = ({ item, onClick }) => {
   const urg = URGENCY[item.urgencyLevel] || URGENCY.FAIBLE;
-  const st = STATUS_MAP[item.status] || STATUS_MAP.EN_ATTENTE;
+  const ds = DIRECTOR_STATUS[item.directorReviewStatus] || null;
 
   return (
-    <div
-      onClick={onClick}
-      className="bg-white border border-sos-gray-200 rounded-xl p-4 hover:shadow-card-hover
-                 transition-all cursor-pointer group"
-    >
+    <div onClick={onClick}
+      className="bg-white border border-sos-gray-200 rounded-xl p-4 hover:shadow-card-hover transition-all cursor-pointer group">
       <div className="flex items-center justify-between mb-2">
         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${urg.bg} ${urg.text}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${urg.dot}`} />
-          {urg.label}
+          <span className={`w-1.5 h-1.5 rounded-full ${urg.dot}`} /> {urg.label}
         </span>
         <span className="text-xs text-sos-gray-400">{fmtShort(item.createdAt)}</span>
       </div>
 
-      {item.escalated && (
+      {ds && (
         <div className="mb-2">
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sos-red-light text-sos-red">
-            <AlertTriangle className="w-3 h-3" /> Escaladé
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${ds.bg} ${ds.color}`}>
+            <ds.icon className="w-3 h-3" /> {ds.label}
           </span>
         </div>
       )}
@@ -368,7 +509,7 @@ const SignalementCard = ({ item, onClick }) => {
       <p className="text-xs text-sos-gray-500 mb-2 line-clamp-1">{item.description}</p>
 
       <div className="flex items-center justify-between">
-        <span className={`text-xs font-medium ${st.color}`}>{st.label}</span>
+        <span className="text-xs text-sos-gray-400">{item.village?.name || '—'}</span>
         <ChevronRight className="w-4 h-4 text-sos-gray-300 group-hover:text-sos-blue transition" />
       </div>
     </div>
@@ -383,7 +524,7 @@ export default function DashboardDirecteur() {
   const [signalements, setSignalements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const [tab, setTab] = useState('escalated'); // escalated | all | closed
+  const [tab, setTab] = useState('pending'); // pending | signed | forwarded | all
   const [exporting, setExporting] = useState(false);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -413,15 +554,11 @@ export default function DashboardDirecteur() {
       const records = data.data || [];
       if (records.length === 0) { setExporting(false); return; }
       const headers = Object.keys(records[0]);
-      const csvRows = [
-        headers.join(','),
-        ...records.map(r => headers.map(h => {
-          const val = r[h];
-          if (val == null) return '';
-          const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-          return `"${str.replace(/"/g, '""')}"`;
-        }).join(','))
-      ];
+      const csvRows = [headers.join(','), ...records.map(r => headers.map(h => {
+        const val = r[h]; if (val == null) return '';
+        const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      }).join(','))];
       const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url;
@@ -431,12 +568,14 @@ export default function DashboardDirecteur() {
     setExporting(false);
   };
 
-  // Filter signalements by tab
-  const escalated = signalements.filter(s => s.escalated && s.escalatedTo?.includes('DIRECTEUR_VILLAGE'));
-  const enCours   = signalements.filter(s => ['EN_ATTENTE', 'EN_COURS'].includes(s.status));
-  const closed    = signalements.filter(s => ['CLOTURE', 'FAUX_SIGNALEMENT'].includes(s.status));
+  // Director queue filters
+  const pending   = signalements.filter(s => s.directorReviewStatus === 'PENDING'
+                    || (s.status === 'CLOTURE' && !s.directorReviewStatus && !s.isArchived));
+  const signed    = signalements.filter(s => s.directorReviewStatus === 'SIGNED');
+  const forwarded = signalements.filter(s => s.directorReviewStatus === 'FORWARDED');
+  const allActive = signalements.filter(s => ['EN_ATTENTE', 'EN_COURS'].includes(s.status) || s.directorReviewStatus);
 
-  const filteredList = tab === 'escalated' ? escalated : tab === 'all' ? enCours : closed;
+  const filteredList = tab === 'pending' ? pending : tab === 'signed' ? signed : tab === 'forwarded' ? forwarded : allActive;
 
   if (loading) {
     return (
@@ -457,7 +596,7 @@ export default function DashboardDirecteur() {
             <div>
               <h1 className="text-xl font-bold text-sos-gray-900">Tableau de bord — Directeur Village</h1>
               <p className="text-sm text-sos-gray-500">
-                Supervision & gouvernance · {user.village?.name || user.name}
+                Signature & transmission des dossiers · {user.village?.name || user.name}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -479,16 +618,16 @@ export default function DashboardDirecteur() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Stats row */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <StatCard label="Total" value={ov.total ?? 0} icon={BarChart3} color="text-sos-blue" bgLight="bg-sos-blue-light" />
-          <StatCard label="En attente" value={ov.enAttente ?? 0} icon={Clock} color="text-yellow-700" bgLight="bg-sos-yellow-light" />
-          <StatCard label="En cours" value={ov.enCours ?? 0} icon={Activity} color="text-sos-blue" bgLight="bg-sos-blue-light" />
-          <StatCard label="Clôturés" value={ov.cloture ?? 0} icon={CheckCircle2} color="text-sos-green" bgLight="bg-sos-green-light" />
-          <StatCard label="Escaladés" value={escalated.length} icon={AlertTriangle} color="text-sos-red" bgLight="bg-sos-red-light" />
+          <StatCard label="Total village" value={ov.total ?? 0} icon={BarChart3} color="text-sos-blue" bgLight="bg-sos-blue-light" />
+          <StatCard label="À signer" value={pending.length} icon={PenTool} color="text-amber-600" bgLight="bg-amber-100" />
+          <StatCard label="Signés" value={signed.length} icon={FileCheck} color="text-sos-blue" bgLight="bg-sos-blue-light" />
+          <StatCard label="Envoyés" value={forwarded.length} icon={Send} color="text-sos-green" bgLight="bg-sos-green-light" />
+          <StatCard label="En cours" value={ov.enCours ?? 0} icon={Activity} color="text-yellow-700" bgLight="bg-sos-yellow-light" />
         </div>
 
         {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Incident type breakdown */}
+          {/* Incident types */}
           <div className="bg-white border border-sos-gray-200 rounded-xl shadow-card p-6">
             <h3 className="text-sm font-bold text-sos-gray-700 uppercase tracking-wide mb-4">Types d'incidents</h3>
             <div className="space-y-3">
@@ -539,22 +678,25 @@ export default function DashboardDirecteur() {
           </div>
         </div>
 
-        {/* Signalements tabs + list */}
+        {/* Tabs + list */}
         <div className="bg-white border border-sos-gray-200 rounded-xl shadow-card">
           <div className="border-b border-sos-gray-200 px-6 pt-4">
-            <div className="flex gap-6">
+            <div className="flex gap-6 overflow-x-auto">
               {[
-                { key: 'escalated', label: 'Escaladés', count: escalated.length },
-                { key: 'all',       label: 'En cours',  count: enCours.length },
-                { key: 'closed',    label: 'Clôturés',  count: closed.length },
+                { key: 'pending',   label: 'À signer',     count: pending.length,   icon: PenTool },
+                { key: 'signed',    label: 'Signés',        count: signed.length,    icon: FileCheck },
+                { key: 'forwarded', label: 'Envoyés',       count: forwarded.length, icon: Send },
+                { key: 'all',       label: 'Tous en cours', count: allActive.length,  icon: Activity },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key)}
-                  className={`pb-3 text-sm font-medium border-b-2 transition cursor-pointer ${
+                  className={`pb-3 text-sm font-medium border-b-2 transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                     tab === t.key
                       ? 'border-sos-blue text-sos-blue'
                       : 'border-transparent text-sos-gray-500 hover:text-sos-gray-700'
                   }`}>
-                  {t.label} <span className="ml-1 text-xs bg-sos-gray-100 px-2 py-0.5 rounded-full">{t.count}</span>
+                  <t.icon className="w-3.5 h-3.5" />
+                  {t.label}
+                  <span className="ml-1 text-xs bg-sos-gray-100 px-2 py-0.5 rounded-full">{t.count}</span>
                 </button>
               ))}
             </div>
@@ -564,7 +706,9 @@ export default function DashboardDirecteur() {
             {filteredList.length === 0 ? (
               <div className="text-center py-12">
                 <CheckCircle2 className="w-12 h-12 text-sos-gray-300 mx-auto mb-3" />
-                <p className="text-sos-gray-500">Aucun signalement dans cette catégorie</p>
+                <p className="text-sos-gray-500">
+                  {tab === 'pending' ? 'Aucun dossier en attente de signature' : 'Aucun signalement dans cette catégorie'}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

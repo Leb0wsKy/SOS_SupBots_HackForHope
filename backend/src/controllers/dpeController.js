@@ -204,6 +204,11 @@ export const submitDPEDraft = async (req, res) => {
       submittedAt: new Date(),
       submittedBy: req.user.id
     };
+
+    // Mark dossier as ready for Director Village signature
+    if (!signalement.directorReviewStatus) {
+      signalement.directorReviewStatus = 'PENDING';
+    }
     
     await signalement.save();
     await signalement.populate('reports.dpeFinal.metadata.submittedBy', 'name email');

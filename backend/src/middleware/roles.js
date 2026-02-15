@@ -157,17 +157,13 @@ export const checkWorkflowAssignment = async (req, res, next) => {
   }
 };
 
-// Governance-only operations (closure/archive)
+// Governance-only operations (closure/archive) — National (L3) and Super Admin (L4) only
 export const allowGovernanceOperation = (req, res, next) => {
   if (req.user.role === 'LEVEL3' || req.user.role === 'LEVEL4') {
     return next();
   }
-  // Allow Village Directors (LEVEL2) governance operations
-  if (req.user.roleDetails === 'VILLAGE_DIRECTOR') {
-    return next();
-  }
   
   return res.status(403).json({ 
-    message: 'Access denied. Only governance (Level 3/4) or Village Directors can perform this operation.'
+    message: 'Access denied. Only the Responsable National (Level 3/4) can close or archive signalements.'
   });
 };
