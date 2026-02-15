@@ -25,8 +25,11 @@ import {
   Send,
   FileCheck,
   Stamp,
+  History,
 } from 'lucide-react';
 import { Toast, useToast } from '../components/Toast';
+import ConfirmModal, { useConfirm } from '../components/ConfirmModal';
+import HistoryPanel from '../components/HistoryPanel';
 import {
   getAnalytics,
   getVillageRatings,
@@ -230,14 +233,15 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   const [actionLoading, setActionLoading] = useState('');
   const [previewFile, setPreviewFile] = useState(null);
   const [toast, showToast, dismissToast] = useToast();
+  const [confirmProps, showConfirm] = useConfirm();
   if (!item) return null;
 
   const urg = URGENCY_BADGES[item.urgencyLevel] || URGENCY_BADGES.FAIBLE;
   const st = STATUS_MAP[item.status] || STATUS_MAP.EN_ATTENTE;
 
   const handleClose = async () => {
-    const reason = prompt('Raison de la clôture :');
-    if (!reason) return;
+    const reason = await showConfirm({ title: 'Clôturer le signalement', message: 'Veuillez indiquer la raison de la clôture.', withInput: true, inputRequired: true, inputLabel: 'Raison de la clôture', inputPlaceholder: 'Saisissez la raison…', confirmText: 'Clôturer' });
+    if (reason === false) return;
     setActionLoading('close');
     try { await closeSignalement(item._id, reason); showToast('success', 'Signalement clôturé.'); onRefresh(); }
     catch (err) { showToast('error', err.response?.data?.message || 'Erreur lors de la clôture.'); }
@@ -245,7 +249,8 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   };
 
   const handleArchive = async () => {
-    if (!confirm('Archiver ce signalement ?')) return;
+    const ok = await showConfirm({ title: 'Archiver le signalement', message: 'Êtes-vous sûr de vouloir archiver ce signalement ?', danger: true, confirmText: 'Archiver' });
+    if (!ok) return;
     setActionLoading('archive');
     try { await archiveSignalement(item._id); showToast('success', 'Signalement archivé.'); onRefresh(); }
     catch (err) { showToast('error', err.response?.data?.message || 'Erreur lors de l\'archivage.'); }
@@ -516,6 +521,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
 
       {/* Toast notification */}
       <Toast toast={toast} onDismiss={dismissToast} />
+      <ConfirmModal {...confirmProps} />
     </div>
   );
 };
@@ -624,6 +630,7 @@ export default function DashboardNational() {
               { key: 'analytics', label: 'Analyse' },
               { key: 'escalated', label: `Escaladés (${escalated.length})` },
               { key: 'all', label: `Tous actifs (${allActive.length})` },
+              { key: 'history', label: 'Historique' },
             ].map(v => (
               <button key={v.key} onClick={() => setActiveView(v.key)}
                 className={`pb-3 text-sm font-medium border-b-2 transition cursor-pointer ${
@@ -806,6 +813,11 @@ export default function DashboardNational() {
               </div>
             )}
           </div>
+        )}
+
+        {/* History view */}
+        {activeView === 'history' && (
+          <HistoryPanel />
         )}
       </div>
 

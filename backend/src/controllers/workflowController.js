@@ -262,14 +262,14 @@ export const downloadTemplate = async (req, res) => {
     const { templateName } = req.params;
 
     const templates = {
-      'fiche-initiale':       'rapport_initial_template.txt',
-      'rapport-dpe':          'rapport_dpe_template.txt',
-      'evaluation-complete':  'evaluation_complete_template.txt',
-      'plan-action':          'plan_action_template.txt',
-      'rapport-suivi':        'rapport_suivi_template.txt',
-      'rapport-final':        'rapport_final_template.txt',
+      'fiche-initiale':       'rapport_initial_template.docx',
+      'rapport-dpe':          'rapport_dpe_template.docx',
+      'evaluation-complete':  'evaluation_complete_template.docx',
+      'plan-action':          'plan_action_template.docx',
+      'rapport-suivi':        'rapport_suivi_template.docx',
+      'rapport-final':        'rapport_final_template.docx',
       // Keep backward compat
-      'rapport-initial':      'rapport_initial_template.txt',
+      'rapport-initial':      'rapport_initial_template.docx',
     };
 
     const filename = templates[templateName];
@@ -284,6 +284,7 @@ export const downloadTemplate = async (req, res) => {
       return res.status(404).json({ message: 'Fichier template introuvable.' });
     }
 
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.download(filePath, filename);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

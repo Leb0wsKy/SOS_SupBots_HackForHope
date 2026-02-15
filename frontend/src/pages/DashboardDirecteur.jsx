@@ -20,8 +20,11 @@ import {
   Upload,
   Stamp,
   FileCheck,
+  History,
 } from 'lucide-react';
 import { Toast, useToast } from '../components/Toast';
+import ConfirmModal, { useConfirm } from '../components/ConfirmModal';
+import HistoryPanel from '../components/HistoryPanel';
 import {
   getAnalytics,
   getSignalements,
@@ -111,6 +114,7 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   const [sigImage, setSigImage] = useState(null);
   const [dpeContent, setDpeContent] = useState(null);
   const [toast, showToast, dismissToast] = useToast();
+  const [confirmProps, showConfirm] = useConfirm();
 
   if (!item) return null;
 
@@ -157,7 +161,8 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   };
 
   const handleForward = async () => {
-    if (!confirm('Envoyer ce dossier signé au Responsable National de Sauvegarde ?')) return;
+    const ok = await showConfirm({ title: 'Transmettre le dossier', message: 'Envoyer ce dossier signé au Responsable National de Sauvegarde ?', confirmText: 'Envoyer' });
+    if (!ok) return;
     setActionLoading('forward');
     try {
       await directorForwardDossier(item._id);
@@ -170,7 +175,8 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
   };
 
   const handleArchive = async () => {
-    if (!confirm('Archiver ce signalement ?')) return;
+    const ok = await showConfirm({ title: 'Archiver le signalement', message: 'Êtes-vous sûr de vouloir archiver ce signalement ?', danger: true, confirmText: 'Archiver' });
+    if (!ok) return;
     setActionLoading('archive');
     try {
       await archiveSignalement(item._id);
@@ -558,7 +564,9 @@ const DetailDrawer = ({ item, onClose, onRefresh }) => {
         </div>
       )}
       {/* Toast notification */}
-      <Toast toast={toast} onDismiss={dismissToast} />    </div>
+      <Toast toast={toast} onDismiss={dismissToast} />
+      <ConfirmModal {...confirmProps} />
+    </div>
   );
 };
 
@@ -771,6 +779,7 @@ export default function DashboardDirecteur() {
                 { key: 'signed',    label: 'Signés',        count: signed.length,    icon: FileCheck },
                 { key: 'forwarded', label: 'Envoyés',       count: forwarded.length, icon: Send },
                 { key: 'all',       label: 'Tous en cours', count: allActive.length,  icon: Activity },
+                { key: 'history',   label: 'Historique',    count: null,             icon: History },
               ].map(t => (
                 <button key={t.key} onClick={() => setTab(t.key)}
                   className={`pb-3 text-sm font-medium border-b-2 transition cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
@@ -780,14 +789,16 @@ export default function DashboardDirecteur() {
                   }`}>
                   <t.icon className="w-3.5 h-3.5" />
                   {t.label}
-                  <span className="ml-1 text-xs bg-sos-gray-100 px-2 py-0.5 rounded-full">{t.count}</span>
+                  {t.count !== null && <span className="ml-1 text-xs bg-sos-gray-100 px-2 py-0.5 rounded-full">{t.count}</span>}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="p-6">
-            {filteredList.length === 0 ? (
+            {tab === 'history' ? (
+              <HistoryPanel />
+            ) : filteredList.length === 0 ? (
               <div className="text-center py-12">
                 <CheckCircle2 className="w-12 h-12 text-sos-gray-300 mx-auto mb-3" />
                 <p className="text-sos-gray-500">
